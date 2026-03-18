@@ -5,8 +5,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import openpyxl
-from openpyxl.utils import get_column_letter
+from openpyxl.descriptors import sequence as _sequence_module
+
+_original_convert = _sequence_module._convert  # type: ignore[attr-defined]
+
+
+def _patched_convert(expected_type, value):
+    try:
+        return _original_convert(expected_type, value)
+    except TypeError:
+        return None
+
+
+_sequence_module._convert = _patched_convert  # type: ignore[attr-defined]
+
+import openpyxl  # noqa: E402
+from openpyxl.utils import get_column_letter  # noqa: E402
 
 
 def convert_value(value: Any) -> Any:
@@ -113,9 +127,10 @@ def read_excel(file_path: str, sheet_name: str | None = None) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Excel file not found: {file_path}")
 
-    if not path.suffix.lower() in [".xlsx", ".xlsm"]:
+    if path.suffix.lower() not in [".xlsx", ".xlsm"]:
         raise ValueError(
-            f"Unsupported file format: {path.suffix}. Only .xlsx and .xlsm are supported."
+            f"Unsupported file format: {path.suffix}. "
+            "Only .xlsx and .xlsm are supported."
         )
 
     workbook = openpyxl.load_workbook(path, data_only=True)
