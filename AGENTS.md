@@ -34,6 +34,33 @@ skills/<skill-name>/
 1. **内嵌项目优先**：技能功能优先基于 `packages/<embedded_project>/` 实现
 2. **脚本间接调用**：内嵌项目通过 `scripts/` 下的脚本间接调用
 3. **跨平台支持**：同时提供 Bash 和 PowerShell 脚本
+4. **换行符规范**：Bash/Python 脚本必须使用 LF 换行符，PowerShell 脚本使用 CRLF
+
+### 换行符问题
+
+在 WSL2/Windows 混合环境下，Git 默认会将 LF 转换为 CRLF，导致 Bash 脚本无法执行：
+
+```
+/bin/bash: line 1: script.sh: cannot execute: required file not found
+```
+
+**原因**：CRLF 换行符使 shebang 变成 `#!/bin/bash\r`，系统找不到该解释器。
+
+**解决方案**：项目根目录必须包含 `.gitattributes` 文件：
+
+```gitattributes
+* text=auto
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.py text eol=lf
+```
+
+**检查方法**：
+```bash
+file scripts/<script-name>
+# 正确: ASCII text executable
+# 错误: ASCII text executable, with CRLF line terminators
+```
 
 ### 依赖管理
 
