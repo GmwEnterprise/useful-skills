@@ -16,6 +16,13 @@ if ($args.Count -eq 0) {
     exit 1
 }
 
+$ExcelFile = $args[0]
+$SheetName = if ($args.Count -gt 1) { $args[1] } else { "" }
+
+if (-not [System.IO.Path]::IsPathRooted($ExcelFile)) {
+    $ExcelFile = (Resolve-Path -Path $ExcelFile -ErrorAction Stop).Path
+}
+
 Push-Location $PackageDir
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
@@ -25,6 +32,10 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 }
 
 uv sync --quiet
-uv run python main.py @args
+if ($SheetName) {
+    uv run python main.py $ExcelFile $SheetName
+} else {
+    uv run python main.py $ExcelFile
+}
 
 Pop-Location

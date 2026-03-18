@@ -16,6 +16,13 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
+EXCEL_FILE="$1"
+SHEET_NAME="${2:-}"
+
+if [[ "$EXCEL_FILE" != /* ]]; then
+    EXCEL_FILE="$(cd "$(dirname "$EXCEL_FILE")" 2>/dev/null && pwd)/$(basename "$EXCEL_FILE")"
+fi
+
 cd "$PACKAGE_DIR"
 
 if ! command -v uv &> /dev/null; then
@@ -26,4 +33,4 @@ fi
 
 uv sync --quiet
 
-uv run python main.py "$@"
+uv run python main.py "$EXCEL_FILE" $SHEET_NAME
