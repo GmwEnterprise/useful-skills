@@ -33,35 +33,42 @@ description: Use when reading Excel files (.xlsx/.xlsm) to extract data. Trigger
 
 ## 输出格式
 
+执行成功后，输出：
+```
+Success: <文件名>
+Markdown: <缓存路径>/<文件名>.md
+JSON: <缓存路径>/<文件名>.json
+```
+
+Markdown 文件包含格式化的表格，JSON 文件包含完整元数据（合并单元格信息、数据类型等）。
+
+**缓存目录位置**：
+- Linux: `~/.cache/excel-reader/` 或 `$XDG_CACHE_HOME/excel-reader/`
+- macOS: `~/Library/Caches/excel-reader/`
+- Windows: `%USERPROFILE%\.cache\excel-reader\`
+
+**Markdown 示例**：
+```markdown
+# data.xlsx
+
+## Sheet1
+
+| 姓名 | 年龄 | 城市 |
+| --- | --- | --- |
+| 张三 | 25 | 北京 |
+| 李四 | 30 | 上海 |
+```
+
+**JSON 结构**（包含完整元数据）：
 ```json
 {
   "file": "/path/to/file.xlsx",
   "sheets": [
     {
       "name": "Sheet1",
-      "data": [
-        [
-          {
-            "value": "姓名",
-            "type": "string",
-            "column": "A",
-            "row": 1
-          }
-        ]
-      ],
-      "dimensions": {
-        "rows": 10,
-        "columns": 5
-      },
-      "merged_cells": [
-        {
-          "range": "A1:B1",
-          "start_row": 1,
-          "start_col": 1,
-          "end_row": 1,
-          "end_col": 2
-        }
-      ]
+      "data": [[...]],
+      "dimensions": {"rows": 10, "columns": 5},
+      "merged_cells": [...]
     }
   ]
 }
@@ -131,10 +138,14 @@ Error: Sheet 'Data' not found. Available sheets: Sheet1, Sheet2
 ```bash
 # 读取所有 sheets
 ./scripts/excel-reader data.xlsx
+# 输出:
+# Success: data.xlsx
+# Markdown: ~/.cache/excel-reader/data.md
+# JSON: ~/.cache/excel-reader/data.json
 
 # 读取指定 sheet
 ./scripts/excel-reader data.xlsx "销售数据"
 
-# 在其他命令中使用
-./scripts/excel-reader data.xlsx | jq '.sheets[0].data'
+# 查看生成的 Markdown
+cat ~/.cache/excel-reader/data.md
 ```

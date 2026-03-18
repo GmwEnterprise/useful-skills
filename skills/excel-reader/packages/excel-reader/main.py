@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -121,6 +122,70 @@ def sheet_to_dict(sheet) -> dict:
     }
 
 
+def get_cache_dir() -> Path:
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache:
+        return Path(xdg_cache) / "excel-reader"
+    home = Path.home()
+    if sys.platform == "darwin":
+        return home / "Library" / "Caches" / "excel-reader"
+    return home / ".cache" / "excel-reader"
+
+
+def sheet_to_markdown(sheet) -> str:
+    lines = [f"## {sheet.title}", ""]
+    max_row = sheet.max_row
+    max_col = sheet.max_column
+
+    if max_row == 0 or max_col == 0:
+        lines.append("*（空表格）*")
+        return "\n".join(lines)
+
+    data = []
+    for row_idx in range(1, max_row + 1):
+        row_data = []
+        for col_idx in range(1, max_col + 1):
+            cell = sheet.cell(row_idx, col_idx)
+            value, _ = get_merged_cell_value(sheet, row_idx, col_idx, cell)
+            row_data.append(format_cell_value(value))
+        data.append(row_data)
+
+    if not data:
+        lines.append("*（无数据）*")
+        return "\n".join(lines)
+
+    header = data[0]
+    lines.append(
+        "| " + " | ".join(str(cell) if cell else " " for cell in header) + " |"
+    )
+    lines.append("| " + " | ".join("---" for _ in header) + " |")
+
+    for row in data[1:]:
+        lines.append(
+            "| " + " | ".join(str(cell) if cell else " " for cell in row) + " |"
+        )
+
+    return "\n".join(lines)
+
+
+def format_cell_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return (
+            value.strftime("%Y-%m-%d %H:%M:%S")
+            if value.hour or value.minute or value.second
+            else value.strftime("%Y-%m-%d")
+        )
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        return str(value)
+    return str(value)
+
+
 def read_excel(file_path: str, sheet_name: str | None = None) -> dict:
     path = Path(file_path)
 
@@ -171,16 +236,60 @@ def main():
     sheet_name = sys.argv[2] if len(sys.argv) > 2 else None
 
     try:
-        result = read_excel(file_path, sheet_name)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        path = Path(file_path)
+        if not path.exists():
+            print(f"Error: Excel file not found: {file_path}", file=sys.stderr)
+            sys.exit(1)
+
+        if path.suffix.lower() not in [".xlsx", ".xlsm"]:
+            print(
+                f"Error: Unsupported file format: {path.suffix}. Only .xlsx and .xlsm are supported.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        workbook = openpyxl.load_workbook(path, data_only=True)
+
+        if sheet_name:
+            if sheet_name not in workbook.sheetnames:
+                available = ", ".join(workbook.sheetnames)
+                print(
+                    f"Error: Sheet '{sheet_name}' not found. Available sheets: {available}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            sheets = [workbook[sheet_name]]
+        else:
+            sheets = list(workbook)
+
+        markdown_lines = [f"# {path.name}", ""]
+        json_data = {"file": str(path.absolute()), "sheets": []}
+
+        for sheet in sheets:
+            markdown_lines.append(sheet_to_markdown(sheet))
+            markdown_lines.append("")
+            json_data["sheets"].append(sheet_to_dict(sheet))
+
+        workbook.close()
+
+        cache_dir = get_cache_dir()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        base_name = path.stem
+        md_file = cache_dir / f"{base_name}.md"
+        json_file = cache_dir / f"{base_name}.json"
+
+        md_file.write_text("\n".join(markdown_lines), encoding="utf-8")
+        json_file.write_text(
+            json.dumps(json_data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        print(f"Success: {path.name}")
+        print(f"Markdown: {md_file}")
+        print(f"JSON: {json_file}")
+
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

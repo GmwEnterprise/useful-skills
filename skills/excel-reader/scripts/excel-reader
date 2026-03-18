@@ -12,7 +12,7 @@ if [ $# -eq 0 ]; then
     echo "  sheet_name  - Optional: Name of specific sheet to read"
     echo ""
     echo "Output:"
-    echo "  JSON format with all sheets and cell data"
+    echo "  Markdown and JSON files saved to cache directory"
     exit 1
 fi
 
@@ -20,7 +20,7 @@ EXCEL_FILE="$1"
 SHEET_NAME="${2:-}"
 
 if [[ "$EXCEL_FILE" != /* ]]; then
-    EXCEL_FILE="$(cd "$(dirname "$EXCEL_FILE")" 2>/dev/null && pwd)/$(basename "$EXCEL_FILE")"
+    EXCEL_FILE="$(pwd)/$EXCEL_FILE"
 fi
 
 cd "$PACKAGE_DIR"

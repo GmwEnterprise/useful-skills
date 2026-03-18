@@ -12,7 +12,7 @@ if ($args.Count -eq 0) {
     Write-Host "  sheet_name  - Optional: Name of specific sheet to read"
     Write-Host ""
     Write-Host "Output:"
-    Write-Host "  JSON format with all sheets and cell data"
+    Write-Host "  Markdown and JSON files saved to cache directory"
     exit 1
 }
 
@@ -20,7 +20,7 @@ $ExcelFile = $args[0]
 $SheetName = if ($args.Count -gt 1) { $args[1] } else { "" }
 
 if (-not [System.IO.Path]::IsPathRooted($ExcelFile)) {
-    $ExcelFile = (Resolve-Path -Path $ExcelFile -ErrorAction Stop).Path
+    $ExcelFile = Join-Path (Get-Location) $ExcelFile
 }
 
 Push-Location $PackageDir
