@@ -12,7 +12,8 @@ if [ $# -eq 0 ]; then
     echo "  sheet_name  - Optional: Name of specific sheet to read"
     echo ""
     echo "Output:"
-    echo "  Markdown and JSON files saved to cache directory"
+    echo "  Markdown: <source_dir>/<filename>.excel_reader.md"
+    echo "  JSON:     <source_dir>/<filename>.excel_reader.json"
     exit 1
 fi
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -120,16 +119,6 @@ def sheet_to_dict(sheet) -> dict:
         "dimensions": {"rows": max_row, "columns": max_col},
         "merged_cells": merge_info,
     }
-
-
-def get_cache_dir() -> Path:
-    xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    if xdg_cache:
-        return Path(xdg_cache) / "excel-reader"
-    home = Path.home()
-    if sys.platform == "darwin":
-        return home / "Library" / "Caches" / "excel-reader"
-    return home / ".cache" / "excel-reader"
 
 
 def sheet_to_markdown(sheet) -> str:
@@ -272,12 +261,10 @@ def main():
 
         workbook.close()
 
-        cache_dir = get_cache_dir()
-        cache_dir.mkdir(parents=True, exist_ok=True)
-
+        output_dir = path.parent
         base_name = path.stem
-        md_file = cache_dir / f"{base_name}.md"
-        json_file = cache_dir / f"{base_name}.json"
+        md_file = output_dir / f"{base_name}.excel_reader.md"
+        json_file = output_dir / f"{base_name}.excel_reader.json"
 
         md_file.write_text("\n".join(markdown_lines), encoding="utf-8")
         json_file.write_text(

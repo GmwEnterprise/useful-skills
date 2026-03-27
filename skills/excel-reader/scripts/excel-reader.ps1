@@ -12,7 +12,8 @@ if ($args.Count -eq 0) {
     Write-Host "  sheet_name  - Optional: Name of specific sheet to read"
     Write-Host ""
     Write-Host "Output:"
-    Write-Host "  Markdown and JSON files saved to cache directory"
+    Write-Host "  Markdown: <source_dir>/<filename>.excel_reader.md"
+    Write-Host "  JSON:     <source_dir>/<filename>.excel_reader.json"
     exit 1
 }
 

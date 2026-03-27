@@ -1,11 +1,20 @@
 ---
 name: excel-reader
-description: Use when reading Excel files (.xlsx/.xlsm) to extract data. Triggers whenever user mentions Excel, xlsx, spreadsheets, or needs to extract/analyze tabular data. Outputs AI-friendly JSON with merge cell support and type inference.
+description: 用于读取 Excel 文件（.xlsx/.xlsm）提取数据。当用户提到 Excel、xlsx、电子表格、表格数据时触发。同时输出 Markdown 和 JSON 两种格式，支持合并单元格、多 sheet、数据类型识别。
 ---
 
 # Excel Reader
 
-读取 Excel 文件并输出结构化 JSON 格式，支持合并单元格、多 sheet、数据类型识别。
+读取 Excel 文件并输出 Markdown 和 JSON 两种格式，支持合并单元格、多 sheet、数据类型识别。
+
+## 前置要求
+
+**重要**：本技能依赖 `uv` 进行 Python 依赖管理。如果用户系统没有安装 `uv`，请停止任务执行并告知用户：
+
+> 当前系统未安装 `uv`，无法执行此技能。请先安装 `uv`：
+> ```bash
+> curl -LsSf https://astral.sh/uv/install.sh | sh
+> ```
 
 ## 何时使用
 
@@ -33,19 +42,20 @@ description: Use when reading Excel files (.xlsx/.xlsm) to extract data. Trigger
 
 ## 输出格式
 
-执行成功后，输出：
+执行成功后，会在**源文件所在目录**生成两个文件：
 ```
 Success: <文件名>
-Markdown: <缓存路径>/<文件名>.md
-JSON: <缓存路径>/<文件名>.json
+Markdown: <源文件目录>/<文件名>.excel_reader.md
+JSON: <源文件目录>/<文件名>.excel_reader.json
 ```
 
-Markdown 文件包含格式化的表格，JSON 文件包含完整元数据（合并单元格信息、数据类型等）。
+**输出文件命名规则**：
+- 源文件 `demo.xlsx` → 输出 `demo.excel_reader.md` 和 `demo.excel_reader.json`
+- 源文件 `/path/to/data.xlsx` → 输出 `/path/to/data.excel_reader.md` 和 `/path/to/data.excel_reader.json`
 
-**缓存目录位置**：
-- Linux: `~/.cache/excel-reader/` 或 `$XDG_CACHE_HOME/excel-reader/`
-- macOS: `~/Library/Caches/excel-reader/`
-- Windows: `%USERPROFILE%\.cache\excel-reader\`
+**Markdown 文件**：包含格式化的表格，适合直接阅读。
+
+**JSON 文件**：包含完整元数据（合并单元格信息、数据类型等），适合程序处理。
 
 **Markdown 示例**：
 ```markdown
@@ -140,12 +150,12 @@ Error: Sheet 'Data' not found. Available sheets: Sheet1, Sheet2
 ./scripts/excel-reader data.xlsx
 # 输出:
 # Success: data.xlsx
-# Markdown: ~/.cache/excel-reader/data.md
-# JSON: ~/.cache/excel-reader/data.json
+# Markdown: /current/path/data.excel_reader.md
+# JSON: /current/path/data.excel_reader.json
 
 # 读取指定 sheet
 ./scripts/excel-reader data.xlsx "销售数据"
 
 # 查看生成的 Markdown
-cat ~/.cache/excel-reader/data.md
+cat data.excel_reader.md
 ```
