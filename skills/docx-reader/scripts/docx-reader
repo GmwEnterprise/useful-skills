@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/docx-reader"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: docx-reader <docx_file> [output_dir]"
+    echo ""
+    echo "Arguments:"
+    echo "  docx_file   - Path to the .docx file"
+    echo "  output_dir  - Optional: Output directory (default: ./docs/extracted)"
+    echo ""
+    echo "Output:"
+    echo "  Markdown: <output_dir>/<filename>.md"
+    echo "  Assets:   <output_dir>/<filename>/ (images, attachments)"
+    exit 1
+fi
+
+DOCX_FILE="$1"
+OUTPUT_DIR="${2:-}"
+
+if [[ "$DOCX_FILE" != /* ]]; then
+    DOCX_FILE="$(pwd)/$DOCX_FILE"
+fi
+
+cd "$PACKAGE_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is not installed. Please install uv first:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv sync --quiet
+
+if [ -n "$OUTPUT_DIR" ]; then
+    uv run python main.py "$DOCX_FILE" "$OUTPUT_DIR"
+else
+    uv run python main.py "$DOCX_FILE"
+fi
