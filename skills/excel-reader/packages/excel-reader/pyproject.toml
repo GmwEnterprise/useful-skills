@@ -1,12 +1,11 @@
 [project]
 name = "excel-reader"
 version = "0.1.0"
-description = "Add your description here"
+description = "Read Excel files (.xlsx/.xlsm) and extract data to Markdown and JSON formats"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "openpyxl>=3.1.5",
-    "xlsx2csv>=0.8.6",
 ]
 
 [dependency-groups]

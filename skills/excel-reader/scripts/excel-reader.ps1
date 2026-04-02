@@ -4,6 +4,8 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PackageDir = Join-Path (Split-Path $ScriptDir -Parent) "packages\excel-reader"
 
+$OriginalPwd = Get-Location
+
 if ($args.Count -eq 0) {
     Write-Host "Usage: excel-reader.ps1 <excel_file> [sheet_name]"
     Write-Host ""
@@ -21,7 +23,7 @@ $ExcelFile = $args[0]
 $SheetName = if ($args.Count -gt 1) { $args[1] } else { "" }
 
 if (-not [System.IO.Path]::IsPathRooted($ExcelFile)) {
-    $ExcelFile = Join-Path (Get-Location) $ExcelFile
+    $ExcelFile = Join-Path $OriginalPwd $ExcelFile
 }
 
 Push-Location $PackageDir
@@ -29,6 +31,7 @@ Push-Location $PackageDir
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Error "Error: uv is not installed. Please install uv first:"
     Write-Error "  irm https://astral.sh/uv/install.ps1 | iex"
+    Pop-Location
     exit 1
 }
 

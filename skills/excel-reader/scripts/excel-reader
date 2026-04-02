@@ -4,6 +4,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/excel-reader"
 
+ORIGINAL_PWD="$(pwd)"
+
 if [ $# -eq 0 ]; then
     echo "Usage: excel-reader <excel_file> [sheet_name]"
     echo ""
@@ -21,7 +23,7 @@ EXCEL_FILE="$1"
 SHEET_NAME="${2:-}"
 
 if [[ "$EXCEL_FILE" != /* ]]; then
-    EXCEL_FILE="$(pwd)/$EXCEL_FILE"
+    EXCEL_FILE="$ORIGINAL_PWD/$EXCEL_FILE"
 fi
 
 cd "$PACKAGE_DIR"
@@ -34,4 +36,4 @@ fi
 
 uv sync --quiet
 
-uv run python main.py "$EXCEL_FILE" $SHEET_NAME
+uv run python main.py "$EXCEL_FILE" ${SHEET_NAME:+"$SHEET_NAME"}

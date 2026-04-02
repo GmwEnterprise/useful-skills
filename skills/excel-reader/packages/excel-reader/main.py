@@ -175,49 +175,17 @@ def format_cell_value(value: Any) -> str:
     return str(value)
 
 
-def read_excel(file_path: str, sheet_name: str | None = None) -> dict:
-    path = Path(file_path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"Excel file not found: {file_path}")
-
-    if path.suffix.lower() not in [".xlsx", ".xlsm"]:
-        raise ValueError(
-            f"Unsupported file format: {path.suffix}. "
-            "Only .xlsx and .xlsm are supported."
-        )
-
-    workbook = openpyxl.load_workbook(path, data_only=True)
-
-    result = {"file": str(path.absolute()), "sheets": []}
-
-    if sheet_name:
-        if sheet_name not in workbook.sheetnames:
-            available = ", ".join(workbook.sheetnames)
-            raise ValueError(
-                f"Sheet '{sheet_name}' not found. Available sheets: {available}"
-            )
-
-        sheet = workbook[sheet_name]
-        result["sheets"].append(sheet_to_dict(sheet))
-    else:
-        for sheet in workbook:
-            result["sheets"].append(sheet_to_dict(sheet))
-
-    workbook.close()
-
-    return result
-
-
 def main():
     if len(sys.argv) < 2:
         print("Usage: python main.py <excel_file> [sheet_name]", file=sys.stderr)
         print("\nArguments:", file=sys.stderr)
         print(
-            "  excel_file  - Path to the Excel file (.xlsx or .xlsm)", file=sys.stderr
+            "  excel_file  - Path to the Excel file (.xlsx or .xlsm)",
+            file=sys.stderr,
         )
         print(
-            "  sheet_name  - Optional: Name of specific sheet to read", file=sys.stderr
+            "  sheet_name  - Optional: Name of specific sheet to read",
+            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -231,10 +199,10 @@ def main():
             sys.exit(1)
 
         if path.suffix.lower() not in [".xlsx", ".xlsm"]:
-            print(
-                f"Error: Unsupported file format: {path.suffix}. Only .xlsx and .xlsm are supported.",
-                file=sys.stderr,
-            )
+            suffix = path.suffix
+            msg = f"Error: Unsupported file format: {suffix}. "
+            msg += "Only .xlsx and .xlsm are supported."
+            print(msg, file=sys.stderr)
             sys.exit(1)
 
         workbook = openpyxl.load_workbook(path, data_only=True)
@@ -242,10 +210,11 @@ def main():
         if sheet_name:
             if sheet_name not in workbook.sheetnames:
                 available = ", ".join(workbook.sheetnames)
-                print(
-                    f"Error: Sheet '{sheet_name}' not found. Available sheets: {available}",
-                    file=sys.stderr,
+                msg = (
+                    f"Error: Sheet '{sheet_name}' not found. "
+                    f"Available sheets: {available}"
                 )
+                print(msg, file=sys.stderr)
                 sys.exit(1)
             sheets = [workbook[sheet_name]]
         else:
