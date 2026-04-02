@@ -309,10 +309,7 @@ def main():
             )
             sys.exit(1)
 
-        if output_dir:
-            out = Path(output_dir)
-        else:
-            out = Path.cwd() / "docs" / "extracted"
+        out = Path(output_dir) if output_dir else Path.cwd() / "docs" / "extracted"
 
         out.mkdir(parents=True, exist_ok=True)
 

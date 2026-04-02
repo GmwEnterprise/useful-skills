@@ -4,12 +4,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/docx-reader"
 
+ORIGINAL_PWD="$(pwd)"
+
 if [ $# -eq 0 ]; then
     echo "Usage: docx-reader <docx_file> [output_dir]"
     echo ""
     echo "Arguments:"
-    echo "  docx_file   - Path to the .docx file"
-    echo "  output_dir  - Optional: Output directory (default: ./docs/extracted)"
+    echo "  docx_file   - Path to the .docx file (supports relative paths from current directory)"
+    echo "  output_dir  - Optional: Output directory (default: docs/extracted)"
     echo ""
     echo "Output:"
     echo "  Markdown: <output_dir>/<filename>.md"
@@ -21,7 +23,15 @@ DOCX_FILE="$1"
 OUTPUT_DIR="${2:-}"
 
 if [[ "$DOCX_FILE" != /* ]]; then
-    DOCX_FILE="$(pwd)/$DOCX_FILE"
+    DOCX_FILE="$ORIGINAL_PWD/$DOCX_FILE"
+fi
+
+if [ -n "$OUTPUT_DIR" ] && [[ "$OUTPUT_DIR" != /* ]]; then
+    OUTPUT_DIR="$ORIGINAL_PWD/$OUTPUT_DIR"
+fi
+
+if [ -z "$OUTPUT_DIR" ]; then
+    OUTPUT_DIR="$ORIGINAL_PWD/docs/extracted"
 fi
 
 cd "$PACKAGE_DIR"
