@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PackageDir = Join-Path (Split-Path $ScriptDir -Parent) "packages\excel-reader"
+$PackageDir = Join-Path (Split-Path $ScriptDir -Parent) "packages\excel"
 
 $OriginalPwd = Get-Location
 

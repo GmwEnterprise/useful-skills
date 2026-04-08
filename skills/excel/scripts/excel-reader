@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/excel-reader"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/excel"
 
 ORIGINAL_PWD="$(pwd)"
 

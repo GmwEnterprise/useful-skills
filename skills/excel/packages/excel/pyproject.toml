@@ -1,7 +1,7 @@
 [project]
-name = "excel-reader"
+name = "excel"
 version = "0.1.0"
-description = "Read Excel files (.xlsx/.xlsm) and extract data to Markdown and JSON formats"
+description = "Read and create Excel files (.xlsx/.xlsm)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
