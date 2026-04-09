@@ -2,12 +2,12 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PackageDir = Join-Path (Split-Path $ScriptDir -Parent) "packages\docx-reader"
+$PackageDir = Join-Path (Split-Path $ScriptDir -Parent) "packages\docx"
 
 $OriginalPwd = Get-Location
 
 if ($args.Count -eq 0) {
-    Write-Host "Usage: docx-reader.ps1 <docx_file> [output_dir]"
+    Write-Host "Usage: docx-read.ps1 <docx_file> [output_dir]"
     Write-Host ""
     Write-Host "Arguments:"
     Write-Host "  docx_file   - Path to the .docx file"

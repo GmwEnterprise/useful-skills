@@ -2,12 +2,12 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/docx-reader"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/docx"
 
 ORIGINAL_PWD="$(pwd)"
 
 if [ $# -eq 0 ]; then
-    echo "Usage: docx-reader <docx_file> [output_dir]"
+    echo "Usage: docx-read <docx_file> [output_dir]"
     echo ""
     echo "Arguments:"
     echo "  docx_file   - Path to the .docx file (supports relative paths from current directory)"
