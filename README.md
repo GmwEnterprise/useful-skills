@@ -4,7 +4,7 @@
 npx skills add https://github.com/GmwEnterprise/useful-skills --skill <skill-name>
 ```
 
-可用 SKILLS 列表：
+可用技能列表：
 
 - excel
-- docx-reader
+- docx
