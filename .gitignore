@@ -1,1 +1,3 @@
 .tmp/
+.ruff_cache/
+.venv/

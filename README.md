@@ -8,3 +8,4 @@ npx skills add https://github.com/GmwEnterprise/useful-skills --skill <skill-nam
 
 - excel
 - docx
+- maven-project-initializer
