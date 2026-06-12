@@ -1,6 +1,6 @@
 ---
 name: excel
-description: 用于读取和创建 Excel 文件。读取时支持 .xlsx/.xlsm 提取数据为 Markdown 和 JSON 格式；创建时通过 JSON 描述表格结构生成带样式的 Excel。当用户提到 Excel、xlsx、电子表格、表格数据、创建 Excel、导出 Excel 时触发。
+description: 专门用于快速读取和创建 Excel 文件
 ---
 
 # Excel Reader & Writer

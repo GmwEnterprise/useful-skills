@@ -1,19 +1,16 @@
 ---
 name: docx
-description: 用于读取和创建 Word 文档（.docx）。读取时提取为 Markdown 并导出附件；创建时从本地 Markdown 生成带样式的 docx，支持标题、正文、表格、图片与常见文本样式配置。
+description: 专门用于快速读取和创建 Word 文档（.docx）
 ---
 
 # Docx
 
-读取 `.docx` 为 Markdown，并从本地 Markdown 生成 `.docx` 文档。
+- 解析 `.docx`，将其导出为 Markdown 文本文件
+- 从本地 Markdown 生成 `.docx` 文档
 
 ## 前置要求
 
-本技能依赖 `uv` 管理 Python 依赖。若系统未安装 `uv`，应先安装：
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+本技能依赖 `uv` 管理 Python 依赖。
 
 ## 何时使用
 
