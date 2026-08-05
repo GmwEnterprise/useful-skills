@@ -4,7 +4,6 @@
 npx skills add https://github.com/GmwEnterprise/useful-skills --skill <skill-name>
 ```
 
-可用技能列表：
+可用技能列表：参考路径 ./skills 下的技能列表。
 
-- excel
-- docx
+具体情阅读 ./AGENTS.md
