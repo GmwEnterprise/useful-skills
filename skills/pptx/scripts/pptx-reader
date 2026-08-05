@@ -1,0 +1,43 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/pptx"
+
+ORIGINAL_PWD="$(pwd)"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: pptx-reader <pptx_file> [output_dir]"
+    echo ""
+    echo "Arguments:"
+    echo "  pptx_file  - Path to the PowerPoint file (.pptx)"
+    echo "  output_dir - Optional: directory for output files (default: same dir as input)"
+    echo ""
+    echo "Output:"
+    echo "  Markdown: <output_dir>/<filename>.pptx_reader.md"
+    echo "  JSON:     <output_dir>/<filename>.pptx_reader.json"
+    exit 1
+fi
+
+PPTX_FILE="$1"
+OUTPUT_DIR="${2:-}"
+
+if [[ "$PPTX_FILE" != /* ]]; then
+    PPTX_FILE="$ORIGINAL_PWD/$PPTX_FILE"
+fi
+
+if [ -n "$OUTPUT_DIR" ] && [[ "$OUTPUT_DIR" != /* ]]; then
+    OUTPUT_DIR="$ORIGINAL_PWD/$OUTPUT_DIR"
+fi
+
+cd "$PACKAGE_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is not installed. Please install uv first:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv sync --quiet
+
+uv run python main.py "$PPTX_FILE" ${OUTPUT_DIR:+"$OUTPUT_DIR"}
