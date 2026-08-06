@@ -80,3 +80,61 @@ def test_insert_slide_position_out_of_range_raises(prs):
 def test_move_slide_missing_target_raises(prs):
     with pytest.raises(ValueError):
         updater.apply_move_slide(prs, {"type": "move_slide", "source": 1})
+
+
+def test_clone_slide_text(prs):
+    n = len(prs.slides._sldIdLst)
+    result = updater.apply_clone_slide(
+        prs, {"type": "clone_slide", "source": 1}
+    )
+    assert len(prs.slides._sldIdLst) == n + 1
+    new_slide = list(prs.slides)[-1]
+    assert any(
+        "标题 Q3" in s.text_frame.text
+        for s in new_slide.shapes
+        if s.has_text_frame
+    )
+    assert not new_slide.has_notes_slide
+    assert "cloned slide 1" in result
+
+
+def test_clone_slide_position(prs):
+    n = len(prs.slides._sldIdLst)
+    updater.apply_clone_slide(
+        prs, {"type": "clone_slide", "source": 2, "position": 1}
+    )
+    assert len(prs.slides._sldIdLst) == n + 1
+    first = prs.slides[0]
+    assert any(s.has_table for s in first.shapes)
+
+
+def test_clone_slide_image(prs, logo_path, tmp_path, shapes_by_type):
+    from pptx import Presentation
+
+    updater.apply_add_picture(
+        prs,
+        {
+            "type": "add_picture",
+            "slide": 2,
+            "path": str(logo_path),
+            "left_cm": 1,
+            "top_cm": 1,
+            "width_cm": 3,
+        },
+    )
+    updater.apply_clone_slide(prs, {"type": "clone_slide", "source": 2})
+    out_path = tmp_path / "out.pptx"
+    prs.save(str(out_path))
+    reopened = Presentation(str(out_path))
+    cloned = list(reopened.slides)[-1]
+    assert shapes_by_type(cloned, "PICTURE")
+
+
+def test_clone_slide_invalid_source_raises(prs):
+    with pytest.raises(ValueError):
+        updater.apply_clone_slide(prs, {"type": "clone_slide", "source": 99})
+
+
+def test_clone_slide_missing_source_raises(prs):
+    with pytest.raises(ValueError):
+        updater.apply_clone_slide(prs, {"type": "clone_slide"})

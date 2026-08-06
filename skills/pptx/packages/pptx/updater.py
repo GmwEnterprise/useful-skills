@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.oxml.ns import qn
 from pptx.util import Cm, Pt
 
 
@@ -392,6 +394,76 @@ def apply_move_slide(prs: Any, op: dict) -> str:
     return f"moved slide {source} -> position {target}"
 
 
+_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+def apply_clone_slide(prs: Any, op: dict) -> str:
+    source = op.get("source")
+    if not isinstance(source, int):
+        raise ValueError("clone_slide requires integer 'source' (1-based)")
+    position = op.get("position")
+    if position is not None and not isinstance(position, int):
+        raise ValueError("'position' must be int (1-based)")
+
+    src = get_slide(prs, source)
+    src_layout = src.slide_layout
+    ids = _sld_id_list(prs)
+    n = len(ids)
+
+    new_slide = prs.slides.add_slide(src_layout)
+    spTree = new_slide.shapes._spTree
+
+    rid_map = {}
+    for rel in src.part.rels.values():
+        if "notesSlide" in rel.reltype:
+            continue
+        if rel.is_external:
+            new_rid = new_slide.part.relate_to(
+                rel.target_ref, rel.reltype, is_external=True
+            )
+        else:
+            new_rid = new_slide.part.relate_to(rel.target_part, rel.reltype)
+        rid_map[rel.rId] = new_rid
+
+    shape_tags = {
+        qn("p:sp"),
+        qn("p:grpSp"),
+        qn("p:pic"),
+        qn("p:graphicFrame"),
+        qn("p:cxnSp"),
+    }
+    r_prefix = "{" + _R_NS + "}"
+
+    for child in list(spTree):
+        if child.tag in shape_tags:
+            spTree.remove(child)
+
+    src_spTree = src.shapes._spTree
+    for child in src_spTree:
+        if child.tag not in shape_tags:
+            continue
+        new_el = deepcopy(child)
+        for node in new_el.iter():
+            for attr in (r_prefix + "embed", r_prefix + "link", r_prefix + "id"):
+                v = node.get(attr)
+                if v is not None and v in rid_map:
+                    node.set(attr, rid_map[v])
+        spTree.insert_element_before(new_el, "p:extLst")
+
+    new_id = ids[n]
+    ids.remove(new_id)
+    if position is None:
+        target = n
+    else:
+        if position < 1 or position > n + 1:
+            raise ValueError(f"position {position} out of range (1..{n + 1})")
+        target = position - 1
+    ids.insert(target, new_id)
+
+    pos_note = "end" if position is None else f"position {position}"
+    return f"cloned slide {source} -> {pos_note} (now {n + 1} slides)"
+
+
 OP_DISPATCH = {
     "replace_text": apply_replace_text,
     "add_picture": apply_add_picture,
@@ -402,6 +474,7 @@ OP_DISPATCH = {
     "delete_slide": apply_delete_slide,
     "insert_slide": apply_insert_slide,
     "move_slide": apply_move_slide,
+    "clone_slide": apply_clone_slide,
 }
 
 

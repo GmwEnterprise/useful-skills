@@ -4,7 +4,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from lxml import etree
 from pptx import Presentation
+from pptx.enum.dml import MSO_COLOR_TYPE
+from pptx.oxml.ns import qn
 
 
 def emu_to_cm(emu: int | None) -> float | None:
@@ -20,6 +23,19 @@ def shape_kind_name(shape: Any) -> str:
         return "UNKNOWN"
 
 
+def run_color(run: Any) -> str | None:
+    color = None
+    try:
+        ct = run.font.color.type
+        if ct == MSO_COLOR_TYPE.RGB:
+            color = "#" + str(run.font.color.rgb)
+        elif ct == MSO_COLOR_TYPE.THEME:
+            color = "theme:" + run.font.color.theme_color.name
+    except Exception:
+        color = None
+    return color
+
+
 def extract_text_frame(tf: Any) -> list[dict]:
     paragraphs = []
     for para in tf.paragraphs:
@@ -29,6 +45,8 @@ def extract_text_frame(tf: Any) -> list[dict]:
                 "bold": r.font.bold,
                 "italic": r.font.italic,
                 "size": r.font.size.pt if r.font.size else None,
+                "font": r.font.name,
+                "color": run_color(r),
             }
             for r in para.runs
         ]
@@ -52,6 +70,10 @@ def shape_to_dict(shape: Any) -> dict:
         "width_cm": emu_to_cm(shape.width),
         "height_cm": emu_to_cm(shape.height),
     }
+    if shape.is_placeholder:
+        phf = shape.placeholder_format
+        ph_type = phf.type.name if phf.type is not None else None
+        d["placeholder"] = {"type": ph_type, "idx": phf.idx}
     if shape.has_text_frame:
         d["text"] = shape.text_frame.text
         d["paragraphs"] = extract_text_frame(shape.text_frame)
@@ -65,11 +87,79 @@ def slide_to_dict(idx: int, slide: Any) -> dict:
     notes = ""
     if slide.has_notes_slide:
         notes = slide.notes_slide.notes_text_frame.text
-    return {"index": idx, "shapes": shapes, "notes": notes}
+    return {
+        "index": idx,
+        "shapes": shapes,
+        "notes": notes,
+        "layout": slide.slide_layout.name,
+    }
 
 
 def cell_inline(text: str) -> str:
     return text.replace("\n", " ").replace("|", "\\|")
+
+
+def extract_design(prs: Any) -> dict:
+    design: dict = {
+        "slide_size": {
+            "width_cm": emu_to_cm(prs.slide_width),
+            "height_cm": emu_to_cm(prs.slide_height),
+        },
+        "layouts": [
+            {"idx": i, "name": lay.name} for i, lay in enumerate(prs.slide_layouts)
+        ],
+        "theme": {"major_font": None, "minor_font": None, "colors": {}},
+    }
+    try:
+        master = prs.slide_masters[0]
+        theme_part = None
+        for rel in master.part.rels.values():
+            if "theme" in rel.reltype:
+                theme_part = rel.target_part
+                break
+        theme_el = etree.fromstring(theme_part.blob)
+        te = theme_el.find(qn("a:themeElements"))
+        font_scheme = te.find(qn("a:fontScheme"))
+        major_font = (
+            font_scheme.find(qn("a:majorFont")).find(qn("a:latin")).get("typeface")
+        )
+        minor_font = (
+            font_scheme.find(qn("a:minorFont")).find(qn("a:latin")).get("typeface")
+        )
+        design["theme"]["major_font"] = major_font
+        design["theme"]["minor_font"] = minor_font
+        clr_scheme = te.find(qn("a:clrScheme"))
+        colors = {}
+        for child in clr_scheme:
+            name = child.tag.split("}")[-1]
+            srgb = child.find(qn("a:srgbClr"))
+            sysc = child.find(qn("a:sysClr"))
+            if srgb is not None:
+                colors[name] = srgb.get("val")
+            elif sysc is not None:
+                colors[name] = sysc.get("lastClr")
+        design["theme"]["colors"] = colors
+    except Exception:
+        pass
+    return design
+
+
+def design_to_markdown(design: dict) -> str:
+    size = design["slide_size"]
+    w = size["width_cm"]
+    h = size["height_cm"]
+    layouts = ", ".join(f"[{lay['idx']}] {lay['name']}" for lay in design["layouts"])
+    major = design["theme"]["major_font"] or "unknown"
+    minor = design["theme"]["minor_font"] or "unknown"
+    colors = design["theme"]["colors"]
+    colors_str = " ".join(f"{k}={v}" for k, v in colors.items())
+    lines = ["## Design", ""]
+    lines.append(f"- Slide size: {w} x {h} cm")
+    lines.append(f"- Layouts: {layouts}")
+    lines.append(f"- Theme fonts: major={major}, minor={minor}")
+    lines.append(f"- Theme colors: {colors_str}")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def slide_to_markdown(idx: int, slide: Any) -> str:
@@ -140,8 +230,11 @@ def main() -> None:
 
         prs = Presentation(str(path))
 
+        design = extract_design(prs)
+
         slides_data = []
         md_lines = [f"# {path.name}", ""]
+        md_lines.append(design_to_markdown(design))
         for idx, slide in enumerate(prs.slides, start=1):
             slides_data.append(slide_to_dict(idx, slide))
             md_lines.append(slide_to_markdown(idx, slide))
@@ -158,6 +251,7 @@ def main() -> None:
             "file": str(path.absolute()),
             "slide_count": len(slides_data),
             "slides": slides_data,
+            "design": design,
         }
         json_file.write_text(
             json.dumps(json_data, ensure_ascii=False, indent=2), encoding="utf-8"

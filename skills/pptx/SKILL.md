@@ -1,6 +1,6 @@
 ---
 name: pptx
-description: 专门用于读取已有 PowerPoint 文件（.pptx），并基于 JSON 指令更新文本（可带样式）、插入图片、删除形状
+description: 基于已有 PowerPoint（.pptx）做增量编辑（非从零创建）：读取提取文本/表格/形状/设计（母版/布局/主题），通过 JSON 指令替换文本（可带样式）、插入图片、删除形状、克隆幻灯片；新增/复制/克隆页面时保留现有模板与设计风格。适合在企业 PPT 上改文字、换图、加页、克隆页等场景。
 ---
 
 # PPTX Reader & Updater
@@ -25,6 +25,7 @@ description: 专门用于读取已有 PowerPoint 文件（.pptx），并基于 J
 - 需要替换文本并同步改变字号/加粗/斜体/颜色/字体
 - 需要向已有幻灯片插入本地图片
 - 需要删除幻灯片中的图片、表格或其它形状
+- 需要在保留母版/背景/标题占位符结构的前提下新增一页（克隆现有页）
 
 ---
 
@@ -58,9 +59,9 @@ Markdown: <dir>/<filename>.pptx_reader.md
 JSON:     <dir>/<filename>.pptx_reader.json
 ```
 
-**Markdown 文件**：每页一个 `## Slide N` 章节，列出文本框文本（按段落缩进）、表格（markdown 表格）、备注。
+**Markdown 文件**：顶部含 `## Design` 设计摘要（幻灯片尺寸、布局列表、主题字体、主题配色）；其后每页一个 `## Slide N` 章节，列出文本框文本（按段落缩进）、表格（markdown 表格）、备注。
 
-**JSON 文件**：完整结构化数据，包含每页的形状（名称/类型/位置/文本/段落/run 级别的样式）、表格、备注，适合程序处理。
+**JSON 文件**：完整结构化数据，适合程序处理。顶层含 `design`（`slide_size` / `layouts` / `theme` 字体与配色）；每页含 `layout`（布局名）；每个形状在为占位符时含 `placeholder`（`type` 如 `TITLE`/`CENTER_TITLE`/`BODY`、`idx`）；每个 run 含 `color`（`#RRGGBB` 或 `theme:ACCENT_1` 或 `null`）与 `font`（字体名或 `null`），另含文本/表格/备注/run 级 bold/italic/size。
 
 ### 读取示例
 
@@ -115,6 +116,7 @@ scripts/pptx-updater.ps1 <pptx_file> <changes.json> [output.pptx]
 | `delete_slide` | 删除指定页 |
 | `insert_slide` | 在指定位置插入新页 |
 | `move_slide` | 调整页序 |
+| `clone_slide` | 克隆（复制）已有页，保留母版/背景/占位符结构 |
 
 ### JSON 指令格式
 
@@ -137,6 +139,7 @@ scripts/pptx-updater.ps1 <pptx_file> <changes.json> [output.pptx]
       "left_cm": 10, "top_cm": 8, "width_cm": 8 },
     { "type": "insert_slide", "position": 2, "layout": "Blank" },
     { "type": "move_slide", "source": 3, "target": 1 },
+    { "type": "clone_slide", "source": 1, "position": 3 },
     { "type": "delete_slide", "slide": 5 }
   ]
 }
@@ -244,6 +247,15 @@ scripts/pptx-updater.ps1 <pptx_file> <changes.json> [output.pptx]
 | `source` | 是 | 源页码（1-based） |
 | `target` | 是 | 目标页码（1-based） |
 
+### clone_slide 字段
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `source` | 是 | 要克隆的源页码（1-based） |
+| `position` | 否 | 新页插入位置（1-based，插到该位置之前）；不填则追加到末尾 |
+
+`clone_slide` 复制源页的全部形状（文本/图片/表格等）及其所在布局，新页继承同一母版的背景与占位符结构，是企业模板下「新增一页且贴合原设计」最稳妥的方式。默认不复制源页备注（notesSlide）；克隆后可再用 `replace_text` 改写新页内容。嵌入图片/图表等关系会被正确重链接，结果可被 PowerPoint 正常打开。
+
 ### 行为说明
 
 - **保留格式**：未提供 `style` 时，`replace_text` 在 run 级别替换并保留原样式。
@@ -254,6 +266,7 @@ scripts/pptx-updater.ps1 <pptx_file> <changes.json> [output.pptx]
 - **move_shape 单形状**：按 `name` 精确定位，调整位置与尺寸，四个尺寸字段任意子集、至少一个。
 - **move_slide 语义**：将 `source` 页移到 `target` 位置，其余页自动顺延。
 - **底层依赖**：`insert_slide`/`move_slide`/`delete_slide` 操作 python-pptx 的内部 `_sldIdLst` 结构（官方尚未提供高层 API），兼容 python-pptx 1.0.x。
+- **克隆保真**：`clone_slide` 复用源页布局（含母版/背景/占位符），深拷贝形状并重链接嵌入关系（rId 重映射）；适合在保留设计语言的前提下批量生成结构相似的新页。
 
 ### 更新示例
 

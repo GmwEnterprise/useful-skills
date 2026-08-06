@@ -108,3 +108,23 @@ def _runs(shape):
 @pytest.fixture
 def runs():
     return _runs
+
+
+@pytest.fixture
+def styled_deck_path(tmp_path: Path) -> Path:
+    from pptx.dml.color import RGBColor
+    from pptx.util import Cm, Pt
+
+    prs = Presentation()
+    prs.slide_width = Cm(25)
+    prs.slide_height = Cm(19)
+    title_layout = prs.slide_layouts[0]
+    s = prs.slides.add_slide(title_layout)
+    s.shapes.title.text = "主标题"
+    run = s.shapes.title.text_frame.paragraphs[0].runs[0]
+    run.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+    run.font.name = "微软雅黑"
+    run.font.size = Pt(40)
+    p = tmp_path / "styled.pptx"
+    prs.save(str(p))
+    return p

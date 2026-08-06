@@ -19,12 +19,12 @@
 - Entry: `skills/pptx/scripts/pptx-reader`, `skills/pptx/scripts/pptx-reader.ps1`
 - Core: `skills/pptx/packages/pptx/main.py`
 - Tests: `skills/pptx/packages/pptx/tests/test_reader.py`
-- Notes: 输出 `<name>.pptx_reader.md` 与 `.json`；不导出图片二进制，JSON 不含 run 级 `color`/`font`
+- Notes: 输出 `<name>.pptx_reader.md` 与 `.json`；不导出图片二进制。JSON 顶层含 `design`（尺寸/布局列表/主题字体与配色），每页含 `layout`，占位符形状含 `placeholder`，run 含 `color`（`#RRGGBB`/`theme:NAME`）/`font`
 
 ### 更新 PPTX
 
-- Description: 基于 JSON 指令更新已有 `.pptx`，9 种操作——形状级 `replace_text`/`add_picture`/`add_textbox`/`delete_shape`/`format_shape`/`move_shape`；幻灯片级 `insert_slide`/`move_slide`/`delete_slide`
+- Description: 基于 JSON 指令更新已有 `.pptx`，10 种操作——形状级 `replace_text`/`add_picture`/`add_textbox`/`delete_shape`/`format_shape`/`move_shape`；幻灯片级 `insert_slide`/`move_slide`/`delete_slide`/`clone_slide`
 - Entry: `skills/pptx/scripts/pptx-updater`, `skills/pptx/scripts/pptx-updater.ps1`，输入 `changes.json`
 - Core: `skills/pptx/packages/pptx/updater.py`（`OP_DISPATCH` 分发表 + 各 `apply_*` 函数）
 - Tests: `skills/pptx/packages/pptx/tests/test_replace_text.py`, `tests/test_shapes.py`, `tests/test_slides.py`
-- Notes: 幻灯片级操作通过 `prs.slides._sldIdLst` + `prs.part.drop_rel` 实现（python-pptx 无高层 API）；新增操作只需添加 `apply_*` 函数并注册到 `OP_DISPATCH`
+- Notes: 幻灯片级操作通过 `prs.slides._sldIdLst` + `prs.part.drop_rel` 实现（python-pptx 无高层 API）；`clone_slide` 复用源页布局、深拷贝 spTree 形状并重链接嵌入关系（rId 重映射），保留母版/背景/占位符结构，默认不克隆备注；新增操作只需添加 `apply_*` 函数并注册到 `OP_DISPATCH`
