@@ -1,8 +1,3 @@
----
-name: packages-type
-description: packages 型技能的创建规范。当你需要创建包含内嵌项目（packages/）的技能时加载此技能。适用于需要第三方依赖管理、复杂逻辑实现的场景。
----
-
 # Packages 型技能规范
 
 packages 型技能通过内嵌项目管理依赖和实现逻辑，脚本作为入口间接调用内嵌项目。

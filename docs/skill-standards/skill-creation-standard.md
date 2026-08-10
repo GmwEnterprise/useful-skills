@@ -1,8 +1,3 @@
----
-name: skill-creation-standard
-description: 创建技能时的通用规范。当你需要创建新技能或修改技能结构时加载此技能。包含技能形态选择、目录结构、SKILL.md 编写规范、路径引用规则等。
----
-
 # 技能创建通用规范
 
 ## 技能形态选择
@@ -11,9 +6,9 @@ description: 创建技能时的通用规范。当你需要创建新技能或修�
 
 | 形态 | 适用场景 | 详见 |
 |------|---------|------|
-| **packages 型** | 需要依赖管理（第三方库、复杂逻辑） | 加载 `packages-type` 技能 |
-| **script 型** | 只需简单脚本，无额外依赖 | 加载 `script-type` 技能 |
-| **instruction 型** | 无代码，纯指令/知识描述 | 加载 `instruction-type` 技能 |
+| **packages 型** | 需要依赖管理（第三方库、复杂逻辑） | 详见 `docs/skill-standards/packages-type.md` |
+| **script 型** | 只需简单脚本，无额外依赖 | 详见 `docs/skill-standards/script-type.md` |
+| **instruction 型** | 无代码，纯指令/知识描述 | 详见 `docs/skill-standards/instruction-type.md` |
 
 **选择原则**：能用 instruction 型解决的不要用 script 型；能用 script 型解决的不要用 packages 型。
 

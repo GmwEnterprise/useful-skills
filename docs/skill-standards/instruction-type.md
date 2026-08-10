@@ -1,8 +1,3 @@
----
-name: instruction-type
-description: instruction 型技能的创建规范。当你需要创建纯指令/知识描述型技能时加载此技能。适用于无代码、通过文本指令指导 AI 行为的场景。
----
-
 # Instruction 型技能规范
 
 instruction 型技能仅包含 SKILL.md，通过结构化的文本描述指导 AI agent 的行为。不包含任何可执行代码。
