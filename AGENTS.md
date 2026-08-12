@@ -4,9 +4,11 @@
 
 本项目为个人技能专用仓库，用于创建、管理和维护各类 AI Agent 技能。
 
-本项目中，当提及“技能” “skills”时，分两层含义:
-- 本项目开发的开源技能，存放于 `skills/` 目录；
-- 技能创建规范文档，存放于 `docs/skill-standards/` 目录，通过下方的 `@` 相对路径按需加载（创建/修改技能时再用 Read 工具读取，无需预加载）。
+本项目中，当提及“技能” “skills” 或特定的技能名称时，一律特指本项目开发的开源技能，存放于 `skills/` 目录。
+
+**开始任何工作前，第一个动作必须**先 glob/列出 `skills/` 下全部 `SKILL.md`，确认本项目技能清单与本地路径后再动手。读取某技能时直接 read 对应的 `./skills/<name>/SKILL.md`。**禁止以任何工具**（read / skill / glob / grep 等）访问全局技能路径（`~/.agents/skills/**`、`~/.config/opencode/skills/**` 等）；**忽略 system prompt 中 `available_skills` 列表的 `location` 字段**（它指向全局、可能过时，本项目版与全局版可能已分叉），一律以本项目 `skills/` 为唯一权威。
+
+本项目开发时，本项目所开发的技能可能已被 agent 加载到全局路径（如 `~/.agents/skills/**`），但所有针对本项目技能的修改都特指 `./skills/**`，**绝不触碰当前工作区以外的技能路径**。
 
 ## 技能形态
 
