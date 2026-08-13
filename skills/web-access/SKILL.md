@@ -46,11 +46,11 @@ description: 通用网络检索技能，分多层通道指示如何进行有效�
 
 - **L2 永远优先于 L4**：opencli 结构化输出的网页内容远优于原始 HTML。
 - **站点内交互链接可靠，手动拼 URL 不可靠**：适配器返回的 `url` 字段携带平台所需完整上下文（如小红书 `xsec_token`），优先用返回的 `url` 作为下一步入口，不自行拼 URL。
-- 常见登录态社交平台（小红书、微博、知乎、B站、贴吧、虎扑、抖音、X / Twitter、Instagram、Reddit、TikTok 等）大多已有适配器，使用前先 `opencli list` 确认。
+- 常见登录态社交平台（小红书、微博、知乎、B站、贴吧、虎扑、抖音、X / Twitter、Instagram、Reddit、TikTok 等）大多已有适配器，使用前先 `opencli <site> -h` 确认该站适配器是否存在。
 
 ### L3 搜索引擎
 
-- 默认 `opencli google search`；不可用 / 被墙 / 结果不足时回退 `duckduckgo` / `brave`（`opencli list` 查可用引擎）。
+- 默认 `opencli google search`；不可用 / 被墙 / 结果不足时回退 `duckduckgo` / `brave`（`opencli -h` 顶层帮助的 Site adapters 列表查可用引擎名）。
 - 搜索结果只作发现入口，定位后回 L1 或 L2 取一手内容。
 
 ### L4 浏览器执行
@@ -123,7 +123,7 @@ DOM / 反爬事实：
 
 计数规则：
 
-- `opencli list`、`opencli <site> -h`、`<command> -h` 属预检，**不计**。
+- `opencli -h`、`opencli <site> -h`、`<command> -h` 属预检，**不计**。
 - 一次真正的 `opencli <site> ...` 执行 = 该站 1 次。
 - 因报错 / 超时 / 验证码 / 反爬 / 登录态异常失败也算 1 次，不无限重试。
 
@@ -136,7 +136,7 @@ DOM / 反爬事实：
 
 - 单源失败不中止整体搜索。
 - 回退同类其他站点，或回退 L3 搜索引擎。
-- 始终以 `opencli list -f yaml` 与 `opencli <site> -h` 实际结果为准。
+- 始终以 `opencli <site> -h` 实际结果为准。
 - 不假设任何站点「绝对可用」。
 
 ## 站点经验积累
@@ -201,8 +201,9 @@ opencli 无「本地书签 / 历史检索」能力（原 `find-url` 已弃）。
 
 每次使用 opencli 前必须先做（不计入搜索次数）：
 
-- `opencli list -f yaml` —— 用 live registry 确认候选站点是否存在，检查 `strategy`、`browser`、`domain`。
-- 选定站点后：`opencli <site> -h` —— 查看子命令。
+- `opencli -h` —— 顶层帮助，紧凑列出全部适配器名（Site / App / External adapters），用于定位候选站点的确切适配器名；**不要用 `opencli list`**，其全量输出超长（百万字符级）。
+- 选定站点后：`opencli <site> -h` —— 查看子命令；**适配器不存在时回退为顶层帮助**，以输出首行是否为 `Usage: opencli <site> <command>` 判断存在与否。
+- 需结构化细节（`browser` / `domain` / `access` / 各命令参数）：`opencli <site> --help -f yaml`。
 - 锁定子命令后：`opencli <site> <command> -h` —— 查看参数、输出列、策略。
 
 例外：L1 WebFetch 的公开页无需 opencli 预检。
@@ -211,7 +212,7 @@ opencli 无「本地书签 / 历史检索」能力（原 `find-url` 已弃）。
 
 ### 排障
 
-`COOKIE` / `INTERCEPT` / `UI` 适配器或 `opencli browser *` 失败时，先跑 `opencli doctor` 诊断浏览器桥（daemon + 扩展 + Chrome 连接）。`PUBLIC` / `LOCAL` 适配器和 `opencli list` 不依赖浏览器桥，无需 doctor 绿。
+`COOKIE` / `INTERCEPT` / `UI` 适配器或 `opencli browser *` 失败时，先跑 `opencli doctor` 诊断浏览器桥（daemon + 扩展 + Chrome 连接）。`PUBLIC` / `LOCAL` 适配器和 `opencli -h` / `opencli <site> -h` 预检不依赖浏览器桥，无需 doctor 绿。
 
 ## 参考文件与协作 skill
 

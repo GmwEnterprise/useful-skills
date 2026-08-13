@@ -19,7 +19,7 @@ updated: 2026-08-10
 
 ## 适配器命令
 
-- 站点名（`opencli list` 中的 site）：
+- 站点名（`opencli -h` 顶层帮助 Site adapters 中的 site）：
 - 主要命令：`opencli <site> <command>`
 - 策略（`strategy`）：PUBLIC / COOKIE / INTERCEPT / UI / LOCAL
 - 已知坑：
