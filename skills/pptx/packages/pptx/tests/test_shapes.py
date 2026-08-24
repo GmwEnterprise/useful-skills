@@ -95,6 +95,33 @@ def test_delete_shape_by_name(prs):
     assert name not in [s.name for s in prs.slides[1].shapes]
 
 
+def test_delete_shape_by_id(prs):
+    target = prs.slides[0].shapes[0]
+    sid = target.shape_id
+    result = updater.apply_delete_shape(
+        prs, {"type": "delete_shape", "slide": 1, "id": sid}
+    )
+    assert sid not in [s.shape_id for s in prs.slides[0].shapes]
+    assert f"removed shape id={sid}" in result
+
+
+def test_delete_shape_by_id_among_duplicates(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    boxes = []
+    for i in range(2):
+        tb = slide.shapes.add_textbox(Cm(1), Cm(13 + i), Cm(5), Cm(1))
+        tb.name = "DUP"
+        boxes.append(tb)
+    updater.apply_delete_shape(
+        prs, {"type": "delete_shape", "slide": 1, "id": boxes[1].shape_id}
+    )
+    remaining = [s for s in slide.shapes if s.name == "DUP"]
+    assert len(remaining) == 1
+    assert remaining[0].shape_id == boxes[0].shape_id
+
+
 def test_delete_shape_no_target_raises(prs):
     with pytest.raises(ValueError):
         updater.apply_delete_shape(prs, {"type": "delete_shape", "slide": 1})
@@ -131,6 +158,29 @@ def test_format_shape_all_shapes_on_slide(prs):
                 assert run.font.bold is True
 
 
+def test_format_shape_by_id(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    boxes = []
+    for i in range(2):
+        tb = slide.shapes.add_textbox(Cm(1), Cm(13 + i), Cm(5), Cm(1))
+        tb.name = "DUP"
+        tb.text_frame.text = f"内容{i}"
+        boxes.append(tb)
+    updater.apply_format_shape(
+        prs,
+        {
+            "type": "format_shape",
+            "slide": 1,
+            "id": boxes[0].shape_id,
+            "style": {"bold": True},
+        },
+    )
+    assert boxes[0].text_frame.paragraphs[0].runs[0].font.bold is True
+    assert boxes[1].text_frame.paragraphs[0].runs[0].font.bold is None
+
+
 def test_move_shape_full(prs):
     shape = prs.slides[0].shapes[0]
     name = shape.name
@@ -162,6 +212,35 @@ def test_move_shape_partial(prs):
     )
     assert abs(shape.left / 360000 - 9) < 0.01
     assert shape.top == orig_top
+
+
+def test_move_shape_by_id_among_duplicates(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    boxes = []
+    for i in range(2):
+        tb = slide.shapes.add_textbox(Cm(1), Cm(13 + i), Cm(5), Cm(1))
+        tb.name = "DUP"
+        boxes.append(tb)
+    second = boxes[1]
+    updater.apply_move_shape(
+        prs, {"type": "move_shape", "slide": 1, "id": second.shape_id, "left_cm": 9}
+    )
+    assert abs(second.left / 360000 - 9) < 0.01
+    assert abs(boxes[0].left / 360000 - 1) < 0.01
+
+
+def test_move_shape_ambiguous_name_raises(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    for i in range(2):
+        slide.shapes.add_textbox(Cm(1), Cm(13 + i), Cm(5), Cm(1)).name = "DUP"
+    with pytest.raises(ValueError, match="ambiguous"):
+        updater.apply_move_shape(
+            prs, {"type": "move_shape", "slide": 1, "name": "DUP", "left_cm": 1}
+        )
 
 
 def test_move_shape_not_found_raises(prs):

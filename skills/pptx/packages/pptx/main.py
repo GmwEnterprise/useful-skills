@@ -63,6 +63,7 @@ def table_to_list(table: Any) -> list[list[str]]:
 
 def shape_to_dict(shape: Any) -> dict:
     d: dict = {
+        "id": shape.shape_id,
         "name": shape.name,
         "type": shape_kind_name(shape),
         "left_cm": emu_to_cm(shape.left),
@@ -99,6 +100,22 @@ def cell_inline(text: str) -> str:
     return text.replace("\n", " ").replace("|", "\\|")
 
 
+def layout_shape_summary(shape: Any) -> dict:
+    d: dict = {
+        "id": shape.shape_id,
+        "name": shape.name,
+        "type": shape_kind_name(shape),
+        "left_cm": emu_to_cm(shape.left),
+        "top_cm": emu_to_cm(shape.top),
+        "width_cm": emu_to_cm(shape.width),
+        "height_cm": emu_to_cm(shape.height),
+    }
+    if shape.is_placeholder:
+        phf = shape.placeholder_format
+        d["placeholder"] = phf.type.name if phf.type is not None else None
+    return d
+
+
 def extract_design(prs: Any) -> dict:
     design: dict = {
         "slide_size": {
@@ -106,8 +123,17 @@ def extract_design(prs: Any) -> dict:
             "height_cm": emu_to_cm(prs.slide_height),
         },
         "layouts": [
-            {"idx": i, "name": lay.name} for i, lay in enumerate(prs.slide_layouts)
+            {
+                "idx": i,
+                "name": lay.name,
+                "shapes": [layout_shape_summary(s) for s in lay.shapes],
+            }
+            for i, lay in enumerate(prs.slide_layouts)
         ],
+        "slide_layout_map": {
+            str(idx): slide.slide_layout.name
+            for idx, slide in enumerate(prs.slides, start=1)
+        },
         "theme": {"major_font": None, "minor_font": None, "colors": {}},
     }
     try:
@@ -144,6 +170,26 @@ def extract_design(prs: Any) -> dict:
     return design
 
 
+def format_slide_layout_map(mapping: dict) -> list[str]:
+    items = sorted((int(k), v) for k, v in mapping.items())
+    if not items:
+        return []
+    parts = []
+    start = end = items[0][0]
+    name = items[0][1]
+    for idx, lay in items[1:]:
+        if lay == name and idx == end + 1:
+            end = idx
+            continue
+        span = f"{start}" if start == end else f"{start}-{end}"
+        parts.append(f"{span}:{name}")
+        start = end = idx
+        name = lay
+    span = f"{start}" if start == end else f"{start}-{end}"
+    parts.append(f"{span}:{name}")
+    return parts
+
+
 def design_to_markdown(design: dict) -> str:
     size = design["slide_size"]
     w = size["width_cm"]
@@ -158,6 +204,24 @@ def design_to_markdown(design: dict) -> str:
     lines.append(f"- Layouts: {layouts}")
     lines.append(f"- Theme fonts: major={major}, minor={minor}")
     lines.append(f"- Theme colors: {colors_str}")
+    lines.append("")
+    lines.append("### Layout shapes")
+    for lay in design["layouts"]:
+        shapes = lay.get("shapes", [])
+        if shapes:
+            parts = " ".join(
+                f"[{s['name']} {s['type']} ({s['left_cm']},{s['top_cm']}) "
+                f"{s['width_cm']}x{s['height_cm']}]"
+                for s in shapes
+            )
+        else:
+            parts = "(no shapes)"
+        lines.append(f"- [{lay['idx']}] {lay['name']}: {parts}")
+    lines.append("")
+    lines.append("### Slide -> layout")
+    lines.append(
+        "- " + ", ".join(format_slide_layout_map(design["slide_layout_map"]))
+    )
     lines.append("")
     return "\n".join(lines)
 

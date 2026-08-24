@@ -106,3 +106,102 @@ def test_replace_missing_find_raises(prs):
         updater.apply_replace_text(
             prs, {"type": "replace_text", "replace": "X"}
         )
+
+
+def test_set_text_across_runs_keeps_first_run_style(prs):
+    from pptx.util import Cm, Pt
+
+    slide = prs.slides[0]
+    tb = slide.shapes.add_textbox(Cm(1), Cm(12), Cm(20), Cm(3))
+    para = tb.text_frame.paragraphs[0]
+    r1 = para.add_run()
+    r1.text = "小安助手"
+    r1.font.size = Pt(28)
+    r1.font.bold = True
+    r2 = para.add_run()
+    r2.text = "产品下半年建设规划"
+    r2.font.size = Pt(12)
+
+    result = updater.apply_set_text(
+        prs, {"type": "set_text", "slide": 1, "name": tb.name, "text": "新主标题"}
+    )
+    assert tb.text_frame.text == "新主标题"
+    runs = tb.text_frame.paragraphs[0].runs
+    assert len(runs) == 1
+    assert runs[0].font.size.pt == 28
+    assert runs[0].font.bold is True
+    assert "set text" in result
+
+
+def test_set_text_by_id(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    tb = slide.shapes.add_textbox(Cm(1), Cm(12), Cm(20), Cm(3))
+    tb.text_frame.text = "旧标题"
+    updater.apply_set_text(
+        prs,
+        {"type": "set_text", "slide": 1, "id": tb.shape_id, "text": "新标题"},
+    )
+    assert tb.text_frame.text == "新标题"
+
+
+def test_set_text_multi_paragraph(prs):
+    from pptx.util import Cm, Pt
+
+    slide = prs.slides[0]
+    tb = slide.shapes.add_textbox(Cm(1), Cm(12), Cm(20), Cm(3))
+    tf = tb.text_frame
+    tf.text = "第一段"
+    tf.add_paragraph().text = "第二段"
+    tf.paragraphs[0].runs[0].font.size = Pt(24)
+
+    updater.apply_set_text(
+        prs,
+        {"type": "set_text", "slide": 1, "id": tb.shape_id, "text": "甲\n乙\n丙"},
+    )
+    paras = tf.paragraphs
+    assert [p.text for p in paras] == ["甲", "乙", "丙"]
+    for p in paras:
+        assert p.runs[0].font.size.pt == 24
+
+
+def test_set_text_ambiguous_name_raises(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    for i in range(2):
+        tb = slide.shapes.add_textbox(Cm(1), Cm(13 + i), Cm(5), Cm(1))
+        tb.name = "DUP"
+        tb.text_frame.text = f"内容{i}"
+    with pytest.raises(ValueError, match="ambiguous"):
+        updater.apply_set_text(
+            prs, {"type": "set_text", "slide": 1, "name": "DUP", "text": "X"}
+        )
+
+
+def test_set_text_missing_target_raises(prs):
+    with pytest.raises(ValueError):
+        updater.apply_set_text(prs, {"type": "set_text", "slide": 1, "text": "X"})
+
+
+def test_set_text_with_style(prs):
+    from pptx.util import Cm
+
+    slide = prs.slides[0]
+    tb = slide.shapes.add_textbox(Cm(1), Cm(12), Cm(20), Cm(3))
+    tb.text_frame.text = "旧文本"
+    updater.apply_set_text(
+        prs,
+        {
+            "type": "set_text",
+            "slide": 1,
+            "name": tb.name,
+            "text": "新文本",
+            "style": {"size": 20, "color": "FF0000"},
+        },
+    )
+    run = tb.text_frame.paragraphs[0].runs[0]
+    assert run.text == "新文本"
+    assert run.font.size.pt == 20
+    assert str(run.font.color.rgb) == "FF0000"

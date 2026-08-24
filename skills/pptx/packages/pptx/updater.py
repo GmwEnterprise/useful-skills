@@ -73,6 +73,29 @@ def shape_type_name(shape: Any) -> str | None:
         return None
 
 
+def locate_shape(
+    slide: Any, shape_id: int | None = None, name: str | None = None
+) -> Any:
+    if shape_id is None and name is None:
+        raise ValueError("shape location requires 'id' or 'name'")
+    if shape_id is not None:
+        if isinstance(shape_id, bool) or not isinstance(shape_id, int):
+            raise ValueError("'id' must be an integer")
+        for shape in slide.shapes:
+            if shape.shape_id == shape_id:
+                return shape
+        raise ValueError(f"shape id {shape_id} not found on slide")
+    matches = [s for s in slide.shapes if s.name == name]
+    if not matches:
+        raise ValueError(f"shape named {name!r} not found on slide")
+    if len(matches) > 1:
+        raise ValueError(
+            f"ambiguous shape name {name!r}: {len(matches)} shapes match, "
+            "locate by 'id' instead"
+        )
+    return matches[0]
+
+
 def apply_replace_text(prs: Any, op: dict) -> str:
     find = op.get("find")
     replace = op.get("replace")
@@ -94,6 +117,76 @@ def apply_replace_text(prs: Any, op: dict) -> str:
     scope = f"slide {slide}" if slide is not None else "all slides"
     style_note = " +style" if style else ""
     return f"{find!r} -> {replace!r}{style_note} ({scope}): {total} hit(s)"
+
+
+def apply_set_text(prs: Any, op: dict) -> str:
+    slide_index = op.get("slide")
+    if not isinstance(slide_index, int):
+        raise ValueError("set_text requires integer 'slide' (1-based)")
+    text = op.get("text")
+    if not isinstance(text, str):
+        raise ValueError("set_text requires string 'text'")
+    shape_id = op.get("id")
+    name = op.get("name")
+    if shape_id is None and name is None:
+        raise ValueError("set_text requires 'id' or 'name' to locate the shape")
+    style = op.get("style")
+    if style is not None and not isinstance(style, dict):
+        raise ValueError("'style' must be an object")
+
+    slide = get_slide(prs, slide_index)
+    shape = locate_shape(slide, shape_id, name)
+    if not shape.has_text_frame:
+        raise ValueError(f"shape {shape.name!r} has no text frame")
+
+    tf = shape.text_frame
+
+    # capture formatting to carry over: first paragraph's pPr and the first
+    # run's rPr found anywhere in the frame (the first paragraph may be empty)
+    src_ppr = tf.paragraphs[0]._p.find(qn("a:pPr"))
+    src_rpr = None
+    for para in tf.paragraphs:
+        for run in para.runs:
+            src_rpr = run._r.find(qn("a:rPr"))
+            break
+        if src_rpr is not None:
+            break
+
+    lines = text.split("\n")
+
+    for para in tf.paragraphs[1:]:
+        para._p.getparent().remove(para._p)
+    first = tf.paragraphs[0]
+    runs = list(first.runs)
+    if runs:
+        keep = runs[0]
+        for run in runs[1:]:
+            run._r.getparent().remove(run._r)
+    else:
+        keep = first.add_run()
+        if src_rpr is not None:
+            keep._r.insert(0, deepcopy(src_rpr))
+    keep.text = lines[0]
+
+    for seg in lines[1:]:
+        para = tf.add_paragraph()
+        if src_ppr is not None:
+            para._p.insert(0, deepcopy(src_ppr))
+        run = para.add_run()
+        if src_rpr is not None:
+            run._r.insert(0, deepcopy(src_rpr))
+        run.text = seg
+
+    style_note = ""
+    if isinstance(style, dict):
+        styled = apply_style_to_shape(shape, style)
+        style_note = f" +style({styled} run(s))"
+
+    target = f"id={shape.shape_id} {shape.name!r}"
+    return (
+        f"set text on {target} (slide {slide_index}): "
+        f"{len(lines)} paragraph(s){style_note}"
+    )
 
 
 def apply_add_picture(prs: Any, op: dict) -> str:
@@ -141,12 +234,19 @@ def apply_delete_shape(prs: Any, op: dict) -> str:
     slide_index = op.get("slide")
     if not isinstance(slide_index, int):
         raise ValueError("delete_shape requires integer 'slide' (1-based)")
+    shape_id = op.get("id")
     name = op.get("name")
     shape_type = op.get("shape_type")
-    if name is None and shape_type is None:
-        raise ValueError("delete_shape requires 'name' or 'shape_type'")
+    if shape_id is None and name is None and shape_type is None:
+        raise ValueError("delete_shape requires 'id', 'name' or 'shape_type'")
 
     slide = get_slide(prs, slide_index)
+
+    if shape_id is not None:
+        shape = locate_shape(slide, shape_id=shape_id)
+        el = shape._element
+        el.getparent().remove(el)
+        return f"removed shape id={shape_id} ({shape.name!r})"
 
     to_remove = []
     for shape in slide.shapes:
@@ -165,8 +265,13 @@ def apply_delete_shape(prs: Any, op: dict) -> str:
 
 
 def find_shapes(
-    slide: Any, name: str | None = None, shape_type: str | None = None
+    slide: Any,
+    shape_id: int | None = None,
+    name: str | None = None,
+    shape_type: str | None = None,
 ) -> list[Any]:
+    if shape_id is not None:
+        return [locate_shape(slide, shape_id=shape_id)]
     result = []
     for shape in slide.shapes:
         if name is not None:
@@ -205,15 +310,18 @@ def apply_format_shape(prs: Any, op: dict) -> str:
     if not isinstance(style, dict):
         raise ValueError("format_shape requires a 'style' object")
     name = op.get("name")
+    shape_id = op.get("id")
     shape_type = op.get("shape_type")
 
     slide = get_slide(prs, slide_index)
-    shapes = find_shapes(slide, name, shape_type)
+    shapes = find_shapes(slide, shape_id, name, shape_type)
     runs = 0
     for shape in shapes:
         runs += apply_style_to_shape(shape, style)
 
-    if name is not None:
+    if shape_id is not None:
+        target = f"id={shape_id}"
+    elif name is not None:
         target = f"name={name!r}"
     elif shape_type is not None:
         target = f"type={shape_type!r}"
@@ -230,8 +338,9 @@ def apply_move_shape(prs: Any, op: dict) -> str:
     if not isinstance(slide_index, int):
         raise ValueError("move_shape requires integer 'slide' (1-based)")
     name = op.get("name")
-    if not isinstance(name, str):
-        raise ValueError("move_shape requires string 'name'")
+    shape_id = op.get("id")
+    if shape_id is None and not isinstance(name, str):
+        raise ValueError("move_shape requires 'id' or 'name'")
     fields = {
         "left_cm": op.get("left_cm"),
         "top_cm": op.get("top_cm"),
@@ -248,10 +357,7 @@ def apply_move_shape(prs: Any, op: dict) -> str:
             raise ValueError(f"'{k}' must be numeric")
 
     slide = get_slide(prs, slide_index)
-    shapes = find_shapes(slide, name=name)
-    if not shapes:
-        raise ValueError(f"shape named {name!r} not found on slide {slide_index}")
-    shape = shapes[0]
+    shape = locate_shape(slide, shape_id, name)
 
     parts = []
     if fields["left_cm"] is not None:
@@ -266,7 +372,10 @@ def apply_move_shape(prs: Any, op: dict) -> str:
     if fields["height_cm"] is not None:
         shape.height = Cm(fields["height_cm"])
         parts.append(f"height={fields['height_cm']}cm")
-    return f"moved {name!r} on slide {slide_index}: {', '.join(parts)}"
+    return (
+        f"moved id={shape.shape_id} {shape.name!r} on slide {slide_index}: "
+        f"{', '.join(parts)}"
+    )
 
 
 def apply_add_textbox(prs: Any, op: dict) -> str:
@@ -348,6 +457,35 @@ def apply_delete_slide(prs: Any, op: dict) -> str:
     prs.part.drop_rel(rId)
     ids.remove(el)
     return f"removed slide {slide_index} (now {n - 1} slides)"
+
+
+def apply_keep_slides(prs: Any, op: dict) -> str:
+    slides = op.get("slides")
+    if (
+        not isinstance(slides, list)
+        or not slides
+        or any(isinstance(v, bool) or not isinstance(v, int) for v in slides)
+    ):
+        raise ValueError(
+            "keep_slides requires a non-empty 'slides' array of 1-based page numbers"
+        )
+    ids = _sld_id_list(prs)
+    n = len(ids)
+    keep = set(slides)
+    for v in sorted(keep):
+        if v < 1 or v > n:
+            raise ValueError(f"slide {v} out of range (1..{n})")
+    removed = 0
+    for i in range(n, 0, -1):
+        if i in keep:
+            continue
+        el = ids[i - 1]
+        prs.part.drop_rel(el.rId)
+        ids.remove(el)
+        removed += 1
+    return (
+        f"kept {len(keep)} slide(s), removed {removed} (now {n - removed} slides)"
+    )
 
 
 def apply_insert_slide(prs: Any, op: dict) -> str:
@@ -466,12 +604,14 @@ def apply_clone_slide(prs: Any, op: dict) -> str:
 
 OP_DISPATCH = {
     "replace_text": apply_replace_text,
+    "set_text": apply_set_text,
     "add_picture": apply_add_picture,
     "add_textbox": apply_add_textbox,
     "delete_shape": apply_delete_shape,
     "format_shape": apply_format_shape,
     "move_shape": apply_move_shape,
     "delete_slide": apply_delete_slide,
+    "keep_slides": apply_keep_slides,
     "insert_slide": apply_insert_slide,
     "move_slide": apply_move_slide,
     "clone_slide": apply_clone_slide,

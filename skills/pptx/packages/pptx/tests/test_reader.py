@@ -123,3 +123,52 @@ def test_reader_design_default_deck(deck_path, tmp_path, monkeypatch):
     )
     assert "design" in data
     assert data["design"]["layouts"]
+
+
+def test_reader_json_shape_ids(deck_path, tmp_path, monkeypatch):
+    out_dir = tmp_path / "out"
+    monkeypatch.setattr(sys, "argv", ["main.py", str(deck_path), str(out_dir)])
+    main.main()
+
+    data = json.loads(
+        (out_dir / f"{deck_path.stem}.pptx_reader.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    for sl in data["slides"]:
+        for sh in sl["shapes"]:
+            assert isinstance(sh["id"], int)
+        ids = [sh["id"] for sh in sl["shapes"]]
+        assert len(ids) == len(set(ids))
+
+
+def test_reader_design_layout_shapes_and_map(
+    styled_deck_path, tmp_path, monkeypatch
+):
+    out_dir = tmp_path / "out"
+    monkeypatch.setattr(
+        sys, "argv", ["main.py", str(styled_deck_path), str(out_dir)]
+    )
+    main.main()
+
+    base = styled_deck_path.stem
+    data = json.loads(
+        (out_dir / f"{base}.pptx_reader.json").read_text(encoding="utf-8")
+    )
+
+    layouts = data["design"]["layouts"]
+    assert all("shapes" in lay for lay in layouts)
+    title_layouts = [lay for lay in layouts if lay["name"] == "Title Slide"]
+    assert title_layouts
+    assert any(
+        s.get("placeholder") in ("TITLE", "CENTER_TITLE")
+        for lay in title_layouts
+        for s in lay["shapes"]
+    )
+
+    assert data["design"]["slide_layout_map"] == {"1": "Title Slide"}
+
+    md_text = (out_dir / f"{base}.pptx_reader.md").read_text(encoding="utf-8")
+    assert "### Layout shapes" in md_text
+    assert "### Slide -> layout" in md_text
+    assert "1:Title Slide" in md_text

@@ -63,6 +63,38 @@ def test_delete_slide_out_of_range_raises(prs):
         )
 
 
+def test_keep_slides(prs):
+    result = updater.apply_keep_slides(
+        prs, {"type": "keep_slides", "slides": [2, 1]}
+    )
+    assert len(prs.slides._sldIdLst) == 2
+    assert any(
+        "标题 Q3" in s.text_frame.text
+        for s in prs.slides[0].shapes
+        if s.has_text_frame
+    )
+    assert "kept 2 slide(s), removed 0" in result
+
+
+def test_keep_slides_removes_rest(prs):
+    result = updater.apply_keep_slides(prs, {"type": "keep_slides", "slides": [2]})
+    assert len(prs.slides._sldIdLst) == 1
+    assert any(s.has_table for s in prs.slides[0].shapes)
+    assert "removed 1" in result
+
+
+def test_keep_slides_out_of_range_raises(prs):
+    with pytest.raises(ValueError):
+        updater.apply_keep_slides(prs, {"type": "keep_slides", "slides": [1, 9]})
+
+
+def test_keep_slides_invalid_slides_raises(prs):
+    with pytest.raises(ValueError):
+        updater.apply_keep_slides(prs, {"type": "keep_slides", "slides": []})
+    with pytest.raises(ValueError):
+        updater.apply_keep_slides(prs, {"type": "keep_slides", "slides": "1"})
+
+
 def test_move_slide_target_out_of_range_raises(prs):
     with pytest.raises(ValueError):
         updater.apply_move_slide(
