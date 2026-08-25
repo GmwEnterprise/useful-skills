@@ -1,0 +1,90 @@
+#!/bin/bash
+# Export every slide of a .pptx as PNG via LibreOffice (soffice -> PDF ->
+# pdftoppm). Requires LibreOffice and poppler-utils. On Windows with desktop
+# PowerPoint installed, prefer scripts/pptx-render.ps1 (COM, best fidelity).
+set -e
+
+ORIGINAL_PWD="$(pwd)"
+
+if [ $# -lt 1 ] || [ $# -gt 3 ]; then
+    echo "Usage: pptx-render <pptx_file> [output_dir] [width_px]"
+    echo ""
+    echo "Arguments:"
+    echo "  pptx_file  - Path to the PowerPoint file (.pptx)"
+    echo "  output_dir - Optional: directory for slide PNGs (default: <source dir>/render)"
+    echo "  width_px   - Optional: export width in pixels (default: 1600)"
+    echo ""
+    echo "Requires: soffice (LibreOffice), pdftoppm (poppler-utils)"
+    echo "On Windows with PowerPoint installed, use scripts/pptx-render.ps1 instead."
+    exit 1
+fi
+
+PPTX_FILE="$1"
+OUTPUT_DIR="${2:-}"
+WIDTH="${3:-1600}"
+
+if [[ "$PPTX_FILE" != /* ]]; then
+    PPTX_FILE="$ORIGINAL_PWD/$PPTX_FILE"
+fi
+if [ -n "$OUTPUT_DIR" ] && [[ "$OUTPUT_DIR" != /* ]]; then
+    OUTPUT_DIR="$ORIGINAL_PWD/$OUTPUT_DIR"
+fi
+if [ -z "$OUTPUT_DIR" ]; then
+    OUTPUT_DIR="$(dirname "$PPTX_FILE")/render"
+fi
+
+if [ ! -f "$PPTX_FILE" ]; then
+    echo "Error: PowerPoint file not found: $PPTX_FILE" >&2
+    exit 1
+fi
+
+MISSING=""
+for cmd in soffice pdftoppm; do
+    if ! command -v "$cmd" &> /dev/null; then
+        MISSING="$MISSING $cmd"
+    fi
+done
+if [ -n "$MISSING" ]; then
+    echo "Error: missing required command(s):$MISSING" >&2
+    echo "  Install LibreOffice and poppler-utils, or on Windows with PowerPoint" >&2
+    echo "  installed use scripts/pptx-render.ps1 (COM export, best fidelity)." >&2
+    exit 1
+fi
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+soffice --headless --convert-to pdf --outdir "$WORK" "$PPTX_FILE" > /dev/null
+BASE="$(basename "${PPTX_FILE%.*}")"
+PDF="$WORK/$BASE.pdf"
+if [ ! -f "$PDF" ]; then
+    echo "Error: soffice produced no PDF (conversion failed)" >&2
+    exit 1
+fi
+
+pdftoppm -png -scale-to-x "$WIDTH" -scale-to-y -1 "$PDF" "$WORK/slide"
+
+mkdir -p "$OUTPUT_DIR"
+for f in "$WORK"/slide-*.png; do
+    [ -e "$f" ] || continue
+    n="${f##*slide-}"
+    n="${n%.png}"
+    mv "$f" "$OUTPUT_DIR/slide${n}.png"
+done
+
+COUNT="$(find "$OUTPUT_DIR" -maxdepth 1 -name 'slide*.png' | wc -l)"
+
+# cm<->px ratio from the PDF page size when pdfinfo is available
+RATIO_NOTE=""
+if command -v pdfinfo &> /dev/null; then
+    W_PTS="$(pdfinfo "$PDF" | awk '/^Page size:/{print $3}')"
+    if [ -n "$W_PTS" ]; then
+        W_CM="$(awk -v p="$W_PTS" 'BEGIN{printf "%.2f", p / 72 * 2.54}')"
+        RATIO_NOTE="$(awk -v w="$WIDTH" -v c="$W_CM" 'BEGIN{printf "%.3f", w / c}')"
+        echo "Ratio: $RATIO_NOTE px/cm (${WIDTH}px / ${W_CM}cm) - use for cm<->px conversion"
+    fi
+fi
+
+echo "Success: $PPTX_FILE"
+echo "Slides: $COUNT"
+echo "PNG: $OUTPUT_DIR (slide1.png..., ${WIDTH}px width)"

@@ -6,7 +6,7 @@ from typing import Any
 
 from lxml import etree
 from pptx import Presentation
-from pptx.enum.dml import MSO_COLOR_TYPE
+from pptx.enum.dml import MSO_COLOR_TYPE, MSO_FILL
 from pptx.oxml.ns import qn
 
 
@@ -36,6 +36,20 @@ def run_color(run: Any) -> str | None:
     return color
 
 
+def shape_fill(shape: Any) -> str | None:
+    try:
+        fill = shape.fill
+        if fill.type == MSO_FILL.SOLID:
+            fc = fill.fore_color
+            if fc.type == MSO_COLOR_TYPE.RGB:
+                return "#" + str(fc.rgb)
+            if fc.type == MSO_COLOR_TYPE.THEME:
+                return "theme:" + fc.theme_color.name
+    except Exception:
+        return None
+    return None
+
+
 def extract_text_frame(tf: Any) -> list[dict]:
     paragraphs = []
     for para in tf.paragraphs:
@@ -61,6 +75,16 @@ def table_to_list(table: Any) -> list[list[str]]:
     return rows
 
 
+def table_runs(table: Any) -> list[list[list[str]]]:
+    return [
+        [
+            [r.text for para in cell.text_frame.paragraphs for r in para.runs]
+            for cell in row.cells
+        ]
+        for row in table.rows
+    ]
+
+
 def shape_to_dict(shape: Any) -> dict:
     d: dict = {
         "id": shape.shape_id,
@@ -70,6 +94,7 @@ def shape_to_dict(shape: Any) -> dict:
         "top_cm": emu_to_cm(shape.top),
         "width_cm": emu_to_cm(shape.width),
         "height_cm": emu_to_cm(shape.height),
+        "fill": shape_fill(shape),
     }
     if shape.is_placeholder:
         phf = shape.placeholder_format
@@ -80,6 +105,7 @@ def shape_to_dict(shape: Any) -> dict:
         d["paragraphs"] = extract_text_frame(shape.text_frame)
     if shape.has_table:
         d["table"] = table_to_list(shape.table)
+        d["table_runs"] = table_runs(shape.table)
     return d
 
 
@@ -109,6 +135,7 @@ def layout_shape_summary(shape: Any) -> dict:
         "top_cm": emu_to_cm(shape.top),
         "width_cm": emu_to_cm(shape.width),
         "height_cm": emu_to_cm(shape.height),
+        "fill": shape_fill(shape),
     }
     if shape.is_placeholder:
         phf = shape.placeholder_format

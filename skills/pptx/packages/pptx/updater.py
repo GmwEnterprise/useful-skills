@@ -712,7 +712,19 @@ def main() -> None:
         print(f"Output: {out_file}")
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        msg = f"Error: {e}"
+        if (
+            isinstance(e, PermissionError)
+            or "Permission denied" in str(e)
+            or "busy" in str(e)
+        ):
+            msg += (
+                "\nHint: the file may be open in WPS/PowerPoint. Close it and "
+                "retry, or save to a different output path. Check with: "
+                'tasklist | findstr /i "wpp powerpnt" and look for ~$*.pptx '
+                "lock files next to the source."
+            )
+        print(msg, file=sys.stderr)
         sys.exit(1)
 
 

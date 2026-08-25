@@ -47,5 +47,7 @@ if ($OutputFile) {
 } else {
     uv run python updater.py $PptxFile $ChangesFile
 }
+$Code = $LASTEXITCODE
 
 Pop-Location
+exit $Code

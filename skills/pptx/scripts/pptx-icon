@@ -1,0 +1,39 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")/packages/pptx"
+
+ORIGINAL_PWD="$(pwd)"
+
+if [ $# -lt 2 ]; then
+    echo "Usage: pptx-icon <out_dir> <icon_name>... [--color RRGGBB] [--size N] [--prefix set]"
+    echo ""
+    echo "Arguments:"
+    echo "  out_dir     - output directory for PNG files"
+    echo "  icon_name   - one or more iconify icon names (e.g. alert target)"
+    echo ""
+    echo "Options:"
+    echo "  --color RRGGBB  tint color (default FFFFFF)"
+    echo "  --size N        square canvas px (default 256)"
+    echo "  --prefix set    iconify prefix (default mdi)"
+    exit 1
+fi
+
+OUT_DIR="$1"
+shift
+
+if [[ "$OUT_DIR" != /* ]]; then
+    OUT_DIR="$ORIGINAL_PWD/$OUT_DIR"
+fi
+
+cd "$PACKAGE_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is not installed. Please install uv first:" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv sync --quiet
+uv run python icon.py "$OUT_DIR" "$@"

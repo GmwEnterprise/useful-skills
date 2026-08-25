@@ -172,3 +172,36 @@ def test_reader_design_layout_shapes_and_map(
     assert "### Layout shapes" in md_text
     assert "### Slide -> layout" in md_text
     assert "1:Title Slide" in md_text
+
+
+def test_reader_shape_fill_and_table_runs(tmp_path, monkeypatch):
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.util import Cm
+
+    prs = Presentation()
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    tb = s.shapes.add_textbox(Cm(1), Cm(1), Cm(8), Cm(3))
+    tb.text_frame.text = "深色框"
+    tb.fill.solid()
+    tb.fill.fore_color.rgb = RGBColor(0x3C, 0x46, 0x50)
+    table = s.shapes.add_table(2, 2, Cm(1), Cm(6), Cm(10), Cm(2)).table
+    cell = table.cell(0, 0)
+    cell.text_frame.paragraphs[0].add_run().text = "前缀"
+    cell.text_frame.paragraphs[0].add_run().text = "后缀"
+    deck = tmp_path / "filled.pptx"
+    prs.save(str(deck))
+
+    out_dir = tmp_path / "out"
+    monkeypatch.setattr(sys, "argv", ["main.py", str(deck), str(out_dir)])
+    main.main()
+
+    data = json.loads(
+        (out_dir / "filled.pptx_reader.json").read_text(encoding="utf-8")
+    )
+    shapes = data["slides"][0]["shapes"]
+    textbox = [sh for sh in shapes if sh.get("text") == "深色框"][0]
+    assert textbox["fill"] == "#3C4650"
+    table_shape = [sh for sh in shapes if sh.get("table")][0]
+    assert table_shape["table_runs"][0][0] == ["前缀", "后缀"]
+    assert table_shape["table_runs"][0][1] == []

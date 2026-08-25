@@ -45,5 +45,7 @@ if ($OutputDir) {
 } else {
     uv run python main.py $PptxFile
 }
+$Code = $LASTEXITCODE
 
 Pop-Location
+exit $Code

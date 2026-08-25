@@ -28,6 +28,9 @@ description: 基于已有 PowerPoint（.pptx）做增量编辑（非从零创建
 - 需要删除幻灯片中的图片、表格或其它形状
 - 需要批量裁剪幻灯片，仅保留指定页面（如模板抽取、去附录）
 - 需要在保留母版/背景/标题占位符结构的前提下新增一页（克隆现有页）
+- 需要在插入图标/图片前确定框内文字的真实渲染位置（渲染导出 + 像素扫描定坐标）
+- 需要给企业模板配图标（下载 iconify 图标并着色为透明 PNG）
+- 生成或大改后需要视觉核验（改前后 diff + 渲染图复核）
 
 ---
 
@@ -63,7 +66,7 @@ JSON:     <dir>/<filename>.pptx_reader.json
 
 **Markdown 文件**：顶部含 `## Design` 设计摘要（幻灯片尺寸、布局列表、主题字体、主题配色、`### Layout shapes` 各布局的形状明细、`### Slide -> layout` 页→布局映射）；其后每页一个 `## Slide N` 章节，列出文本框文本（按段落缩进）、表格（markdown 表格）、备注。
 
-**JSON 文件**：完整结构化数据，适合程序处理。顶层含 `design`（`slide_size` / `layouts` / `slide_layout_map` / `theme` 字体与配色）。`design.layouts` 每项含 `shapes`（该布局全部形状的 id、名称、类型、位置尺寸、占位符类型——页头横幅、logo、封面装饰等设计元素通常在这一层）；`design.slide_layout_map` 是页码→布局名的映射。每页含 `layout`（布局名）；每个形状含 `id`（shape_id，**页内唯一**）、`name`、位置尺寸字段（`left_cm`/`top_cm`/`width_cm`/`height_cm`），为占位符时含 `placeholder`（`type` 如 `TITLE`/`CENTER_TITLE`/`BODY`、`idx`）；每个 run 含 `color`（`#RRGGBB` 或 `theme:ACCENT_1` 或 `null`）与 `font`（字体名或 `null`），另含文本/表格/备注/run 级 bold/italic/size。
+**JSON 文件**：完整结构化数据，适合程序处理。顶层含 `design`（`slide_size` / `layouts` / `slide_layout_map` / `theme` 字体与配色）。`design.layouts` 每项含 `shapes`（该布局全部形状的 id、名称、类型、位置尺寸、填充色、占位符类型——页头横幅、logo、封面装饰等设计元素通常在这一层）；`design.slide_layout_map` 是页码→布局名的映射。每页含 `layout`（布局名）；每个形状含 `id`（shape_id，**页内唯一**）、`name`、位置尺寸字段（`left_cm`/`top_cm`/`width_cm`/`height_cm`）、`fill`（形状填充色：`#RRGGBB` / `theme:ACCENT_1` / `null`，判断深浅底、配图标配色最需要它），为占位符时含 `placeholder`（`type` 如 `TITLE`/`CENTER_TITLE`/`BODY`、`idx`）；表格形状除 `table`（纯字符串矩阵）外含 `table_runs`（行×列×run 文本列表，用于预判表格内 `replace_text` 能否命中）；每个 run 含 `color`（`#RRGGBB` 或 `theme:ACCENT_1` 或 `null`）与 `font`（字体名或 `null`），另含文本/表格/备注/run 级 bold/italic/size。
 
 > **null 样式语义**：run 的 `size`/`color`/`font` 为 `null` 时表示该 run 未直接设置样式，实际显示值继承自占位符→布局→母版的继承链，分析实际显示效果（如"页头标题统一 20pt"）需结合 `design.layouts` 的布局层信息判断，`null` 不等于"无字号/无颜色"。
 
@@ -291,6 +294,9 @@ scripts/pptx-updater.ps1 <pptx_file> <changes.json> [output.pptx]
 ### 行为说明
 
 - **保留格式**：未提供 `style` 时，`replace_text` 在 run 级别替换并保留原样式。
+- **set_text 样式陷阱**：`set_text` 将"首个 run 样式 + 首段段落属性"应用到整框所有新段落。对"标题行加粗大字 + 正文小字"的**多段多样式框**（如痛点/目标类对比框），整框替换会让正文也变成标题样式——此类框**禁用 set_text**，改用逐段 `replace_text`（每段恰好单 run 时保样式完美）。
+- **clone_slide 连带资源**：克隆会把源页上的图片一起带过来。当克隆目的是"借版式换内容"时，流程应为：克隆 → `delete_shape shape_type=PICTURE`（先清图）→ `set_text`/`replace_text` 改文案 → 重新渲染扫描 → 加新图。
+- **操作顺序法则**：operations 数组按顺序执行，`clone_slide`/`insert_slide`/`move_slide`/`delete_slide`/`keep_slides` 会使后续页码漂移。**结构操作先执行**（可单独跑一轮），内容操作基于结构变更后的最终页码；复杂任务拆成多趟跑 updater（如 clone → 文字 → 图标）最稳。
 - **覆盖范围**：`replace_text` 作用于所有文本框、表格单元格、幻灯片备注。
 - **跨 run 限制**：目标文本被拆分到多个 run 时（混排样式常见），单 run 内查找可能无法命中；此类场景改用 `set_text` 整框替换。建议先用 `pptx-reader` 确认文本结构。
 - **形状定位**：`set_text`/`delete_shape`/`move_shape`/`format_shape` 支持按 `id` 定位（reader JSON 每个形状的 `id` 字段，页内唯一），优先级高于 `name`；同名形状歧义时必须用 `id`。
@@ -332,12 +338,85 @@ scripts/pptx-updater deck.pptx .tmp/changes.json deck_updated.pptx
 
 ### AI 使用模式
 
-当用户需要修改已有 `.pptx` 文本时：
+当用户需要修改已有 `.pptx` 时，按五步流程执行：
 
-1. **读取确认**：先 `scripts/pptx-reader deck.pptx` 读取，定位需要替换的确切原文
-2. **生成指令**：将替换项组织为上述 JSON，保存为临时文件（如 `.tmp/changes.json`）
-3. **应用修改**：执行 `scripts/pptx-updater deck.pptx .tmp/changes.json [output.pptx]`
-4. **告知用户**：输出新文件路径与命中次数
+1. **读取与预检**：先 `scripts/pptx-reader deck.pptx` 读取。`replace_text` 前必须先看 `runs[].text` 做 **run 级预检**——确认目标文本是否被拆分到多个 run、`find` 是否是某个 run 内确实存在的连续片段（如标题拆两个 run、要改的前缀恰在首 run 内才可命中）。表格看 `table_runs`。run 拆散无法命中时换标题/整框用 `set_text`，局部改词调整 `find` 片段。
+2. **定坐标（插入元素时）**：渲染导出 PNG 并做像素扫描，确定框内文字真实边界与留白（见「视觉验证闭环」），再计算插入位置。
+3. **生成指令**：组织为 JSON 保存到 `.tmp/changes.json`；**结构操作在前**，内容操作使用结构变更后的最终页码。
+4. **应用修改**：执行 `scripts/pptx-updater deck.pptx .tmp/changes.json [output.pptx]`。
+5. **核验**：对插入的元素做改前后 diff 双条件核验，并目视复核渲染 PNG（见「视觉验证闭环」）；告知用户新文件路径与命中数。
+
+---
+
+## 视觉验证闭环
+
+PPT 是视觉产物：**文字替换命中 ≠ 版面正确**（新文字可能溢出框、换行错位、样式被破坏）；JSON 只有形状框位置，没有文字真实渲染位置——凡"往已有页面插入元素（图标/图片/新形状）"或"生成/大改后核验"，都要走渲染验证。
+
+### 导出页面 PNG
+
+```bash
+# Windows + 桌面版 PowerPoint（COM 导出，保真度最高）
+scripts/pptx-render.ps1 deck.pptx .tmp/render 1600
+
+# Linux/macOS/WSL2（LibreOffice + poppler：soffice 转 PDF、pdftoppm 逐页出图）
+scripts/pptx-render deck.pptx .tmp/render 1600
+```
+
+输出 `slide1.png...slideN.png`，并打印 **px/cm 换算比例**（如 1600px / 33.87cm）。所有像素↔cm 换算一律用该比例，不要用屏幕 DPI。
+
+已踩坑（脚本已内置规避，自写 COM 代码时须注意）：
+
+- PowerPoint COM 对**中文路径直接 E_FAIL**：先复制到纯 ASCII 临时路径再 Open（ps1 脚本已自动处理）；
+- `WithWindow=0`（不弹窗）在部分环境 E_FAIL，须用 `-1`；
+- WPS 不提供等价 COM 导出接口，需桌面版 PowerPoint；无 Office 环境走 Bash 版（注意 `soffice --convert-to png` 对多页 PPT 只导第一页，必须走 PDF 中转）。
+
+### 像素扫描定位框内文字真实边界（插元素前定坐标）
+
+原理：框内出现次数最多的颜色 = 背景填充色；与背景差异超阈值的像素集合 = 文字/图形 bbox。用逃生舱口环境跑 PIL 脚本：
+
+```python
+from collections import Counter
+# x0,y0,x1,y1 为框内缩进 0.1~0.2cm 后的像素范围（cm * 换算比例）
+c = Counter(im.getpixel((x, y)) for y in range(y0, y1) for x in range(x0, x1))
+bg = c.most_common(1)[0][0][:3]   # 背景色（顺带拿到框的填充色）
+# 遍历求非背景像素的 min/max x/y → 文字 bbox（除以换算比例得 cm）
+```
+
+由此可判断文字对齐方式（bbox 居中/贴左）、左侧留白是否够放图标（实测比视觉模型可靠）。实测规律：**痛点/目标类对比框多为左对齐、框内无留白**，图标需放框外左/右侧；流程框多为居中、留白充足。reader JSON 的 `fill` 字段可直接给出框底色，可与扫描结果互验。
+
+### 改前后 diff 自动核验（插元素后验证）
+
+对每个新增元素的矩形区域，**双条件判定**（两者都过才算通过，可批量出结论，比视觉模型逐个看图可靠）：
+
+1. **改前** PNG 该区域 ≥98% 纯色（证明没压到任何文字）；
+2. **改后**与改前 diff 有 ≥5% 像素变化（证明元素真的渲染出来了）。
+
+---
+
+## 图标素材（iconify → 着色透明 PNG）
+
+`add_picture` 只收本地图片；"给深蓝框配白色线性图标"这类需求用本管线一步产出：
+
+```bash
+# Bash / PowerShell 等价
+scripts/pptx-icon .tmp/icons alert target shield-check --color FFFFFF --size 256
+scripts/pptx-icon.ps1 .tmp/icons alert target shield-check --color FFFFFF
+```
+
+- 素材源为 iconify API（`https://api.iconify.design/<prefix>/<name>.svg`，默认 `mdi` 集，`--prefix` 可换）。**只支持 SVG**（PNG 端点 404）；不存在的图标名会逐一报 HTTP 404，可先 `curl -o /dev/null -s -w '%{http_code}' <url>` 批量校验再执行。
+- 管线：SVG → 白底渲染 → 亮度反转作 alpha 通道 → 整体着目标色 → 裁剪 glyph bbox 居中到统一方形画布——抗锯齿边缘完美保留，插入时尺寸可控。
+- 产出为透明 PNG，配合 `add_picture` 插入，`width_cm` 控制大小。
+
+**语义配色默认策略**（企业模板实测规律，底色看形状的 `fill` 字段）：
+
+| 底色类型 | 图标配色 | 常见用途 |
+|---|---|---|
+| 深蓝/深灰/深色底 | 白色 | 主流程框、栏目标题条 |
+| 红/深红底 | 白色（框外则红本色） | 痛点/代价框 |
+| 橙底 | 白色（框外则橙本色） | 目标/收益框 |
+| 浅蓝/浅灰/白底 | 主题蓝（取自 theme accent） | 来源框、说明条 |
+
+多页重复结构（如每页的"痛点/目标"框）用同一对图标（警示/靶心）可形成跨页视觉语言。
 
 ---
 
@@ -367,6 +446,18 @@ uv run --project <skill_dir>/packages/pptx python your_script.py
 首次运行会自动初始化虚拟环境并安装依赖。
 
 ## 常见问题
+
+### 输出文件被占用
+
+```
+Error: [Errno 13] Permission denied: ...
+Hint: the file may be open in WPS/PowerPoint. Close it and retry, ...
+```
+目标文件正被 WPS/PowerPoint 打开。关闭后重试，或另存为新文件名。排查：`tasklist | findstr /i "wpp powerpnt"`，并检查源文件目录下是否有 `~$*.pptx` 锁文件。
+
+### Windows + Git Bash 下 Bash 脚本参数异常
+
+Git Bash 的 MSYS 路径转换会破坏 `D:\...` 形式的参数（实测被拆成 `D;C:\Program Files\Git\...`）。**Windows 下一律使用 `.ps1` 版脚本**。
 
 ### 文件不存在
 
